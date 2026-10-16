@@ -96,12 +96,14 @@ export function renderLint(m, { color = false } = {}) {
   out.push("");
   if (m.error) { out.push(p.red(`${m.file} ${m.error}`)); return `${out.join("\n")}\n`; }
   const read = m.files.filter((f) => f.exists);
-  if (!read.length) out.push("No settings file was found, so there is nothing to check.");
-  for (const f of read) {
-    out.push(`${p.bold(f.display)}  ${p.dim(f.scope === "file" ? "" : f.label)}`);
+  // a file that is not there can still carry a finding: a settings.jsonc that nothing was built from
+  const listed = m.files.filter((f) => f.exists || f.findings.length);
+  if (!listed.length) out.push("No settings file was found, so there is nothing to check.");
+  for (const f of listed) {
+    out.push(`${p.bold(f.display)}  ${p.dim(f.scope === "file" ? "" : f.label)}${f.exists ? "" : `  ${p.dim("(not found)")}`}`);
     if (!f.findings.length) out.push(`  ${p.green("no findings")}`);
     for (const x of f.findings) {
-      out.push(`  ${p[SEVERITY_TONE[x.severity]](pad(x.severity, 7))} ${pad(x.id, 17)} ${x.line ? `line ${x.line}` : ""}${x.path && x.path !== "(the whole file)" ? `  ${x.path}` : ""}`);
+      out.push(`  ${p[SEVERITY_TONE[x.severity]](pad(x.severity, 7))} ${pad(x.id, 17)} ${x.line ? `line ${x.line}` : ""}${x.path && x.path !== "(the whole file)" ? `  ${x.path}` : ""}`.trimEnd());
       for (const line of wrap(x.message, 92)) out.push(`      ${line}`);
       if (x.fix) for (const line of wrap(`fix: ${x.fix}`, 92)) out.push(`      ${p.dim(line)}`);
     }

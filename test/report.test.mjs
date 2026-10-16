@@ -127,6 +127,20 @@ test("lint: no file, a file with nothing to say, and --file on one file", async 
   assert.match(missing.out, /nothing\.json cannot be read \(ENOENT\)/);
 });
 
+test("lint: a settings.jsonc with no settings.json beside it is shown in the text report, on the file that is missing, as in the other forms", async () => {
+  const w = world("lint-jsonc-only");
+  fs.writeFileSync(`${w.userFile}c`, '// only the commented source\n{\n  "model": "opus"\n}\n');
+  const text = await run(["lint"], w);
+  assert.equal(text.code, 1, "a warning is a finding");
+  assert.doesNotMatch(text.out, /nothing to check/, "the report does not say there is nothing to check while it counts a warning");
+  assert.match(text.out, /\n~\/\.claude\/settings\.json {2}user settings {2}\(not found\)\n {2}warning\s+jsonc-out-of-date\n {6}settings\.jsonc exists but settings\.json does not\./);
+  assert.match(text.out, /\n0 errors, 1 warning, 0 notes in 0 files\n$/);
+  const md = await run(["lint", "--markdown"], w);
+  assert.match(md.out, /- WARNING `jsonc-out-of-date` ~\/\.claude\/settings\.json: settings\.jsonc exists but settings\.json does not\./);
+  const json = JSON.parse((await run(["lint", "--json"], w)).out);
+  assert.deepEqual(json.findings.map((x) => x.id), ["jsonc-out-of-date"]);
+});
+
 test("lint --json: the findings with file, line, column, key path and message", async () => {
   const w = world("lint-json", { user: '{\n  "model": 5,\n  "zzz": 1\n}\n' });
   const j = (await run(["lint", "--json"], w)).json();
