@@ -1,0 +1,40 @@
+{
+  "name": "claude-settings-doctor",
+  "version": "1.0.0",
+  "description": "Comments for your Claude Code settings, and the merged settings nobody shows you: a settings.jsonc that builds settings.json, a lint against the schema, and a view of what every file contributes. Zero tokens.",
+  "type": "module",
+  "bin": {
+    "claude-settings-doctor": "bin/claude-settings-doctor.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    ".claude-plugin",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "repository": "github:nrzz/claude-settings-doctor",
+  "homepage": "https://github.com/nrzz/claude-settings-doctor#readme",
+  "bugs": "https://github.com/nrzz/claude-settings-doctor/issues",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "settings",
+    "jsonc",
+    "json-schema",
+    "linter",
+    "configuration",
+    "comments",
+    "settings-json"
+  ],
+  "author": "Naresh Prabu",
+  "license": "MIT"
+}
