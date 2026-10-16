@@ -38,7 +38,7 @@ npm test
 | `scripts/update-schema.mjs` | downloads the schema by hand; the only code that opens a network connection, and not part of the package |
 | `skills/check/`, `.claude-plugin/` | the user-only skill; the plugin manifest and icon |
 | `test/*.test.mjs` | unit tests; `e2e-claude.test.mjs` runs against the real binary when `E2E_CLAUDE` is set |
-| `test/lint-table.mjs` | 91 settings with one thing wrong in each: what the lint says, and what `claude doctor` lists |
+| `test/lint-table.mjs` | 96 settings with one thing wrong in each: what the lint says, and what `claude doctor` lists |
 
 ## House rules
 

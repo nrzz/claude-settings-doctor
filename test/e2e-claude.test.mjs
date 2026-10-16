@@ -4,7 +4,7 @@
 //      built into settings.json is read;
 //   b. the order of the files (user, project, local) and how they combine: a value is replaced, objects merge key
 //      by key, the hooks of every file run, and `show` says what the binary did;
-//   c. the lint table (test/lint-table.mjs): `claude doctor` lists what the table says for each of the 91 settings,
+//   c. the lint table (test/lint-table.mjs): `claude doctor` lists what the table says for each of the 96 settings,
 //      and the whole file is ignored exactly when the lint says it is; which hooks run when an entry, a group or an
 //      event is wrong is what the lint says remains; env values become the strings the lint says;
 //   d. the plugin: it validates, /settings-doctor:check hands the model the lint report, its skill adds nothing to
