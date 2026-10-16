@@ -204,6 +204,7 @@ test("label and typeText say what a node accepts", () => {
   assert.equal(s.typeText(at("env")), "object");
   assert.match(s.typeText(at("permissions", "defaultMode")), /^one of "acceptEdits"/);
   assert.match(s.label(at("theme")), /^one of "auto".* or a string$/);
+  assert.equal(s.label(at("enabledPlugins", "formatter@anthropic-tools")), "an array of strings or a boolean", "the schema's `not {}` accepts nothing and is not named");
 });
 
 // ---- the vendored schema ----------------------------------------------------------------------------------

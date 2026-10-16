@@ -221,6 +221,10 @@ export function lintFile(file, { schema = vendored(), meta = loadSchema().meta, 
       add("bad-value", "warning", "none", keyPath, `${mine}. The schema asks for this; Claude Code may not mind (claude doctor says whether it does).`);
     } else if (unchecked || (["range", "items", "length"].includes(issue.kind) && !(keyPath.length === 1 && BOUNDS_ENFORCED.has(top)))) {
       add(kind, "warning", "none", keyPath, `${mine}. The schema asks for this, but Claude Code 2.1.295 accepts it without a word.`);
+    } else if (field && top === "extraKnownMarketplaces" && keyPath.length >= 2) {
+      // a marketplace that is wrong costs that marketplace only (claude doctor: "Invalid marketplace entry was ignored")
+      add(kind, "error", "entry", keyPath, `${mine}. Claude Code ignores this entry and applies the rest of the file (claude doctor: "Invalid marketplace entry was ignored").`);
+      removed.push({ path: keyPath.slice(0, 2), effect: "entry", why: issue.message });
     } else if (field) {
       add(kind, "error", "field", keyPath, `${mine}. Claude Code ignores this field and applies the rest of the file (claude doctor: "This field was ignored").`);
       removed.push({ path: keyPath.slice(0, 1), effect: "field", why: issue.message });

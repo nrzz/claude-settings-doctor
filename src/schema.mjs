@@ -112,7 +112,8 @@ export function createSchema(root) {
     if (n.const !== undefined) return JSON.stringify(n.const);
     if (Array.isArray(n.enum)) return `one of ${n.enum.map((e) => JSON.stringify(e)).join(", ")}`;
     const alt = n.anyOf || n.oneOf;
-    if (Array.isArray(alt)) return [...new Set(alt.map((a) => label(a, depth + 1)))].join(" or ");
+    // `{ "not": {} }` is how the schema says "no value": it accepts nothing, so it is not a thing to name
+    if (Array.isArray(alt)) return [...new Set(alt.filter((a) => !(isPlain(a) && isPlain(a.not) && Object.keys(a.not).length === 0)).map((a) => label(a, depth + 1)))].join(" or ");
     const ts = typesOf(n);
     if (!ts) return isPlain(n.properties) ? "an object" : "a value";
     return ts.map((t) => {
