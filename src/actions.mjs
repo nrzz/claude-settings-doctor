@@ -30,17 +30,15 @@ const refuse = (r, why) => { r.refused = why; r.ok = false; return r; };
 
 /**
  * Whether settings.json (`text`) holds other settings than the record of the last build, absorb or init: then a
- * build would throw something away. Returns null when there is no record or nothing changed, else
- * { changes, unusable } where unusable says why Claude Code cannot read settings.json now (a comment, a typo), if so.
+ * build would throw something away. Returns null when there is no record or nothing changed, else { changes }
+ * (empty when settings.json is not an object now, which Claude Code cannot read).
  */
 function changedSinceBuild(text, baselineText) {
   if (text === null || baselineText === null || text === baselineText) return null;
   const was = tryParse(baselineText);
   const now = tryParse(text);
   if (isObject(was) && isObject(now) && sameSettings(was, now)) return null;
-  if (isObject(was) && isObject(now)) return { changes: diffValues(was, now), unusable: null };
-  const a = analyzeText(text);
-  return { changes: [], unusable: a.problems.length ? a.problems[0].message : "it does not hold a JSON object" };
+  return { changes: isObject(was) && isObject(now) ? diffValues(was, now) : [] };
 }
 
 function problemText(b) {
@@ -87,7 +85,7 @@ export function runCheck(opts) {
     r.ok = true;
     r.layoutOnly = true;
     r.lines.push(`${base(p.json)} holds the same settings as ${base(p.jsonc)}, laid out differently. That is not drift: Claude Code reads the same settings.`);
-    r.notes.push(`${cmd(opts, "build")} would write the layout build uses (two-space indentation, comments gone, a final newline).`);
+    r.notes.push(`To write the layout that build uses (two-space indentation, a final newline), run: ${cmd(opts, "build")}`);
     return r;
   }
   r.differs = true;
@@ -114,14 +112,20 @@ export function runBuild(opts) {
     if (baseline !== q.cur && !p.dryRun) writeBaseline(p.cfg, p.json, q.cur, p.now);
     return r;
   }
+  // a settings.json that Claude Code cannot read (a comment, a typo) is not ours to replace: someone wrote something there
+  if (q.cur !== null && !opts.force) {
+    const a = analyzeText(q.cur);
+    if (a.ignored) {
+      r.lines.push(`${base(p.json)} is not usable now, and Claude Code ignores it: ${a.problems[0].message}.`);
+      r.notes.push(`Fix it, or run ${cmd(opts, "build")} --force to write it from ${base(p.jsonc)} (a backup is made either way).`);
+      return refuse(r, `${base(p.json)} is not valid JSON, so building would replace a file that someone wrote and Claude Code cannot read`);
+    }
+  }
   const moved = opts.force ? null : changedSinceBuild(q.cur, baseline);
   if (moved) {
     // settings.json changed since the last build, absorb or init: building would throw that away
-    if (moved.unusable) r.lines.push(`${base(p.json)} has changed since it was last built from ${base(p.jsonc)}, and Claude Code cannot read it now: ${moved.unusable}.`);
-    else {
-      r.lines.push(`${base(p.json)} has changed since it was last built from ${base(p.jsonc)} (Claude Code, or you, edited it):`);
-      r.lines.push(...changeLines(moved.changes));
-    }
+    r.lines.push(`${base(p.json)} has changed since it was last built from ${base(p.jsonc)} (Claude Code, or you, edited it):`);
+    r.lines.push(...changeLines(moved.changes));
     r.notes.push(`Run ${cmd(opts, "absorb")} to keep those changes in ${base(p.jsonc)}, or ${cmd(opts, "build")} --force to overwrite them (a backup is made either way).`);
     return refuse(r, `building now would drop the changes made in ${base(p.json)}`);
   }
@@ -139,7 +143,7 @@ export function runBuild(opts) {
   r.ok = true;
   r.lines.push(`Wrote ${p.json}${q.cur === null ? "" : ` (${q.changes.length ? `${q.changes.length} ${q.changes.length === 1 ? "change" : "changes"}` : "layout only"})`}.`);
   if (q.changes.length) r.lines.push(...changeLines(q.changes));
-  if (r.backup) r.lines.push(`The old file is saved as ${r.backup}. Undo with: ${cmd(opts, "restore")}.`);
+  if (r.backup) r.lines.push(`The old file is saved as ${r.backup}. Undo with: ${cmd(opts, "restore")}`);
   return r;
 }
 
@@ -165,8 +169,8 @@ export function runInit(opts) {
   r.unknown = out.unknown;
   r.text = out.text;
   r.lines.push(`${p.dryRun ? "Would write" : "Wrote"} ${p.jsonc}: ${out.annotated} keys annotated${out.unknown ? `, ${out.unknown} not in the schema` : ""}.`);
-  if (cur === null) r.notes.push(`${base(p.json)} does not exist yet, so ${base(p.jsonc)} starts empty. Add settings to it, then run ${cmd(opts, "build")}.`);
-  r.notes.push(`Edit ${base(p.jsonc)}, then run ${cmd(opts, "build")}; Claude Code reads ${base(p.json)} only.`);
+  if (cur === null) r.notes.push(`${base(p.json)} does not exist yet, so ${base(p.jsonc)} starts empty. Add settings to it, then run: ${cmd(opts, "build")}`);
+  r.notes.push(`Claude Code reads ${base(p.json)} only. Edit ${base(p.jsonc)}, then run: ${cmd(opts, "build")}`);
   r.ok = true;
   if (p.dryRun) return r;
   if (had !== null) { r.backup = backupFile(p.jsonc, p.now); r.lines.push(`The old file is saved as ${r.backup}.`); }
@@ -217,7 +221,7 @@ export function runAbsorb(opts) {
   if (res.applied.length) {
     r.backup = backupFile(p.jsonc, p.now);
     writeAtomic(p.jsonc, res.text);
-    r.lines.push(`The old ${base(p.jsonc)} is saved as ${r.backup}. Undo with: ${cmd(opts, "restore")} --jsonc.`);
+    r.lines.push(`The old ${base(p.jsonc)} is saved as ${r.backup}. Undo with: ${cmd(opts, "restore")} --jsonc`);
   }
   // the record moves on, unless something was left for the person to decide
   if (!r.conflicts.length) writeBaseline(p.cfg, p.json, jsonText, p.now);

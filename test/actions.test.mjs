@@ -165,7 +165,7 @@ test("build --user writes settings.json from settings.jsonc: no comments, no tra
   assert.equal(w.read(w.userFile), '{\n  "model": "opus",\n  "permissions": {\n    "allow": [\n      "Bash(git status)",\n      "Bash(npm test)"\n    ]\n  },\n  "env": {\n    "FOO": "1"\n  }\n}\n');
   assert.match(r.out, /Wrote .*settings\.json \(\d+ changes?\)\./);
   assert.match(r.out, /~ model: "old" -> "opus"/);
-  assert.match(r.out, /Undo with: claude-settings-doctor restore --user\./);
+  assert.match(r.out, /Undo with: claude-settings-doctor restore --user$/m);
   const backups = w.backups(w.userFile);
   assert.equal(backups.length, 1);
   assert.equal(fs.readFileSync(path.join(w.claude, backups[0]), "utf8"), J({ model: "old" }), "the old file, byte for byte");
@@ -236,17 +236,31 @@ test("build is not stopped by a settings.json that only looks different: another
   assert.match(r.out, /Wrote .*settings\.json \(layout only\)/);
 });
 
-test("build with a settings.json that Claude Code cannot read now: refused with the reason, not with an empty list of changes", async () => {
+test("build leaves a settings.json that Claude Code cannot read alone, with or without a record of the last build, and says why; --force replaces it after a backup", async () => {
   const w = world("build-unusable");
   fs.writeFileSync(jsoncOf(w.userFile), COMMENTED);
   await run(["build", "--user"], w);
-  fs.writeFileSync(w.userFile, `// note\n${w.read(w.userFile)}`);
+  const noted = `// note\n${w.read(w.userFile)}`;
+  fs.writeFileSync(w.userFile, noted);
   const r = await run(["build", "--user"], w);
   assert.equal(r.code, 1);
-  assert.match(r.out, /settings\.json has changed since it was last built from settings\.jsonc, and Claude Code cannot read it now: a comment \(\/\/\), which JSON does not have\./);
-  assert.match(r.out, /Refused/);
-  assert.equal((await run(["build", "--user", "--force"], w)).code, 0);
+  assert.match(r.out, /settings\.json is not usable now, and Claude Code ignores it: a comment \(\/\/\), which JSON does not have\./);
+  assert.match(r.out, /Refused: settings\.json is not valid JSON, so building would replace a file that someone wrote and Claude Code cannot read/);
+  assert.match(r.out, /Fix it, or run claude-settings-doctor build --user --force to write it from settings\.jsonc \(a backup is made either way\)\./);
+  assert.equal(w.read(w.userFile), noted, "nothing was written");
+  // the same with no record at all
+  fs.rmSync(path.join(w.claude, "settings-doctor"), { recursive: true, force: true });
+  const norecord = await run(["build", "--user"], w);
+  assert.equal(norecord.code, 1);
+  assert.equal(w.read(w.userFile), noted);
+  // an empty file is not a file someone wrote
+  fs.writeFileSync(w.userFile, "");
+  assert.equal((await run(["build", "--user"], w)).code, 0);
+  fs.writeFileSync(w.userFile, noted);
+  const forced = await run(["build", "--user", "--force"], w);
+  assert.equal(forced.code, 0, forced.all);
   assert.equal(JSON.parse(w.read(w.userFile)).model, "opus");
+  assert.ok(w.backups(w.userFile).some((b) => fs.readFileSync(path.join(w.claude, b), "utf8") === noted), "the file that was replaced is kept");
 });
 
 test("build with no record of the last build: it goes ahead after a backup and says the old file held changes it could not check", async () => {
@@ -405,7 +419,7 @@ test("absorb: what Claude Code wrote into settings.json goes into settings.jsonc
   assert.match(r.out, /Took 2 changes from settings\.json into settings\.jsonc:/);
   assert.match(r.out, /\+ permissions\.allow item "Bash\(ls -la\)"/);
   assert.match(r.out, /\+ theme = "dark"/);
-  assert.match(r.out, /Undo with: claude-settings-doctor restore --user --jsonc\./);
+  assert.match(r.out, /Undo with: claude-settings-doctor restore --user --jsonc$/m);
   const jsonc = w.read(jsoncOf(w.userFile));
   for (const kept of ["// my settings", "// the model", "// pick", "// read-only", '"Bash(ls -la)"', '"theme": "dark"']) assert.ok(jsonc.includes(kept), kept);
   assert.equal(w.backups(jsoncOf(w.userFile)).length, 1);
