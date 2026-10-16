@@ -284,3 +284,25 @@ test("the usage block of the README is the help text of the CLI, and nothing is 
   assert.ok(readme.includes(usage), "the README's usage block is out of date: paste the output of claude-settings-doctor --help from its Usage line");
   assert.ok(!readme.includes("@@"), "a placeholder is still in the README");
 });
+
+test("the numbers the README quotes are the numbers of the code: the table, the cap, the instruction, the description, the schema", async () => {
+  const readme = read("README.md");
+  const { ROWS } = await import("./lint-table.mjs");
+  assert.ok(readme.includes(`holds ${ROWS.length} settings with one thing wrong in each`), `the lint table has ${ROWS.length} rows`);
+  assert.ok(readme.includes(`for every one of the ${ROWS.length},`));
+  // the cap of the markdown report
+  const w = world("readme-cap");
+  w.user(Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`unknownKey${i}`, i])));
+  const md = (await run(["lint", "--markdown"], w)).out;
+  assert.equal(md.split("\n").filter((l) => l.startsWith("- WARNING")).length, 12);
+  assert.ok(readme.includes("at most 12 findings") || readme.includes("at most 12 of them"));
+  // what the skill costs: its instruction and its description
+  const skill = read("skills/check/SKILL.md");
+  const body = skill.slice(/^---\n[\s\S]*?\n---\n/.exec(skill)[0].length);
+  const instruction = body.split("\n").filter((l) => l && !l.startsWith("!`")).join("\n");
+  assert.ok(readme.includes(`${instruction.length}-character instruction`), `the instruction is ${instruction.length} characters`);
+  const desc = /^description: (.+)$/m.exec(skill)[1];
+  assert.ok(readme.includes(`\`${desc}\`: ${desc.length} characters`), `the description is ${desc.length} characters`);
+  // the schema
+  assert.ok(readme.includes(`${loadSchema().meta.properties} top-level keys`));
+});
