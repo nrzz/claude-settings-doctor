@@ -311,6 +311,7 @@ test("the lint table put to the binary: for each of the settings, `claude doctor
   });
   let effectChecked = 0;
   let quotedChecked = 0;
+  const distinctPhrases = new Set(results.flatMap((r) => r.quoted));
   for (const r of results) {
     assert.deepEqual(r.got, [...r.row.doctor].sort(), `${r.row.name}: what claude doctor lists`);
     quotedChecked += r.quoted.length;
@@ -320,7 +321,7 @@ test("the lint table put to the binary: for each of the settings, `claude doctor
       assert.equal(r.applied, !r.lintIgnored, `${r.row.name}: the binary ${r.applied ? "applied" : "ignored"} the file; the lint says it is ${r.lintIgnored ? "ignored" : "applied"}`);
     }
   }
-  t.diagnostic(`${results.length} settings put to the binary: claude doctor agreed with the table on all ${results.length}, and printed every one of the ${quotedChecked} phrases the lint quotes from it; for ${effectChecked} of them (an object without a model) the file was applied or ignored as the lint says`);
+  t.diagnostic(`${results.length} settings put to the binary: claude doctor agreed with the table on all ${results.length}, and printed every phrase the lint quotes from it (${distinctPhrases.size} distinct phrases, ${quotedChecked} quotes in all); for ${effectChecked} of them (an object without a model) the file was applied or ignored as the lint says`);
   assert.ok(effectChecked >= 60);
 });
 
