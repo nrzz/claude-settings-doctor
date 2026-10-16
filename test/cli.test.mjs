@@ -251,9 +251,11 @@ test("bin: a reader that goes away early (| head) is not an error", async () => 
   w.user({ env });
   const child = spawn(process.execPath, [CLI, "show"], { cwd: w.work, env: w.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
   const done = new Promise((resolve) => child.on("close", (code) => resolve(code)));
-  await new Promise((resolve) => child.stdout.once("data", resolve));
-  child.stdout.destroy();
-  assert.equal(await done, 0);
+  try {
+    await new Promise((resolve) => child.stdout.once("data", resolve));
+    child.stdout.destroy();
+    assert.equal(await done, 0);
+  } finally { child.kill(); }
 });
 
 test("runCli refuses to run against a folder outside the temporary folder", () => {
