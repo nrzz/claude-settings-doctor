@@ -35,15 +35,15 @@ The commented source (each takes --user, --project <dir> or --local to name the 
            write settings.jsonc next to settings.json, every key annotated from the schema
   build    [--force] [--dry-run]
            write settings.json from settings.jsonc: comments and trailing commas gone, keys in
-           order, two-space indentation; after a backup; refuses when settings.json changed since
-           the last build (--force overrides)
+           order, two-space indentation; the old file is saved first; refuses when settings.json
+           changed since the last build (--force overrides)
   check
            exit 1 when settings.json holds other settings than build would write from
            settings.jsonc, or does not exist (for CI and pre-commit); a different layout alone is
            fine. Writes nothing
   absorb   [--dry-run]
            take what Claude Code changed in settings.json (an "Always allow" rule, a /config
-           change) into settings.jsonc, comments kept, after a backup
+           change) into settings.jsonc, comments kept; the old settings.jsonc is saved first
   watch    [--poll <ms>] [--dry-run]
            build now, and again on every save of settings.jsonc; --poll looks at the file every
            <ms> milliseconds, for a place where folder events do not arrive
@@ -65,8 +65,8 @@ Exit codes: 0 ok; 1 findings, a difference or a refusal; 2 a usage error or an u
 Environment: CLAUDE_CONFIG_DIR (Claude's config folder), NO_COLOR, and
 CLAUDE_SETTINGS_DOCTOR_MANAGED_DIR (the folder to read managed-settings.json from, instead of the
 system folder; the tests use it).
-It reads settings files, writes only with init, build, absorb, watch and restore (after a
-backup), and never uses the network.
+It reads settings files, writes only with init, build, absorb, watch and restore (a file they
+replace is saved next to itself first), and never uses the network.
 `;
 
 class UsageError extends Error {}
