@@ -241,7 +241,7 @@ test("bin: a process prints the same, with the same exit codes", () => {
 });
 
 test("bin: the first line is a node shebang (npm makes the file executable from package.json's bin)", () => {
-  assert.match(fs.readFileSync(CLI, "utf8"), /^#!\/usr\/bin\/env node\n/);
+  assert.match(fs.readFileSync(CLI, "utf8"), /^#!\/usr\/bin\/env node\r?\n/);
   assert.equal(pkg.bin["claude-settings-doctor"], "bin/claude-settings-doctor.mjs");
 });
 

@@ -215,7 +215,7 @@ test("the vendored schema and its record: where it came from, when, and its lice
   assert.equal(meta.licence, "Apache-2.0");
   assert.equal(meta.properties, Object.keys(schema.properties).length);
   const text = fs.readFileSync(new URL("../src/schema/claude-code-settings.json", import.meta.url), "utf8");
-  assert.equal(meta.bytes, Buffer.byteLength(text));
+  assert.equal(meta.bytes, Buffer.byteLength(text.replace(/\r\n/g, "\n")), "the size of the file as downloaded (a checkout may turn line feeds into CRLF)");
   const licence = fs.readFileSync(new URL("../src/schema/LICENSE", import.meta.url), "utf8");
   assert.match(licence, /Apache License\s+Version 2\.0/);
   assert.equal(schema.type, "object");
