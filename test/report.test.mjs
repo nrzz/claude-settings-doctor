@@ -101,7 +101,8 @@ test("lint: each file with its findings, the line, the key and what to do; a cou
   assert.equal(r.code, 1);
   assert.match(r.out, /^claude-settings-doctor \d+\.\d+\.\d+ {2}lint\nproject {3}/);
   assert.match(r.out, /\n\.claude\/settings\.local\.json {2}local settings\n {2}error\s+invalid-json\s+line 2\n {6}The file has a comment \(\/\/\)/);
-  assert.match(r.out, /\n {6}fix: Keep the notes in a settings\.jsonc and write settings\.json with claude-settings-doctor build, or delete the comments\.\n/);
+  assert.ok(r.out.split("\n").filter((line) => line.startsWith("      ")).every((line) => line.length <= 100), "the messages are wrapped");
+  assert.match(r.out.replace(/\n {6}/g, " "), /fix: Keep the notes in a settings\.jsonc and write settings\.json with claude-settings-doctor build, or delete the comments\.\n/);
   assert.match(r.out, /\n~\/\.claude\/settings\.json {2}user settings\n {2}error\s+wrong-type\s+line 2 {2}model\n/);
   assert.match(r.out, /\n {2}warning\s+deprecated\s+line 3 {2}includeCoAuthoredBy\n/);
   assert.match(r.out, /\n3 errors, 1 warning, 0 notes in 2 files\n$/);

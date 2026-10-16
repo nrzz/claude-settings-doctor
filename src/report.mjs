@@ -8,6 +8,19 @@ export const palette = (on) => {
 };
 
 export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** The text broken into lines of at most `width` columns at spaces (a longer word has a line of its own); each line break of the text starts a new line. */
+export function wrap(text, width) {
+  const lines = [];
+  for (const para of String(text).replace(/\r/g, "").split(/\n+/)) {
+    let line = "";
+    for (const word of para.trim().split(/\s+/).filter(Boolean)) {
+      if (line && line.length + 1 + word.length > width) { lines.push(line); line = word; } else line = line ? `${line} ${word}` : word;
+    }
+    if (line) lines.push(line);
+  }
+  return lines;
+}
 const pad = (s, n) => String(s).padEnd(n);
 const clip = (s, n) => { const t = String(s).replace(/\s+/g, " "); return t.length > n ? `${t.slice(0, n - 3)}...` : t; };
 const BT = "`";
@@ -89,8 +102,8 @@ export function renderLint(m, { color = false } = {}) {
     if (!f.findings.length) out.push(`  ${p.green("no findings")}`);
     for (const x of f.findings) {
       out.push(`  ${p[SEVERITY_TONE[x.severity]](pad(x.severity, 7))} ${pad(x.id, 17)} ${x.line ? `line ${x.line}` : ""}${x.path && x.path !== "(the whole file)" ? `  ${x.path}` : ""}`);
-      out.push(`      ${x.message}`);
-      if (x.fix) out.push(`      ${p.dim(`fix: ${x.fix}`)}`);
+      for (const line of wrap(x.message, 92)) out.push(`      ${line}`);
+      if (x.fix) for (const line of wrap(`fix: ${x.fix}`, 92)) out.push(`      ${p.dim(line)}`);
     }
     out.push("");
   }
@@ -118,7 +131,10 @@ export function markdownLint(m, { max = 12, width = 300 } = {}) {
   const shown = important.slice(0, max);
   for (const f of shown) {
     const at = f.display ? ` ${f.display}${f.line ? `:${f.line}` : ""}` : "";
-    out.push(clip(`- ${f.severity.toUpperCase()} ${BT}${f.id}${BT}${at}${f.path && f.path !== "(the whole file)" ? ` ${BT}${f.path}${BT}` : ""}: ${withoutDoctor(f.message)}${f.fix ? ` Fix: ${f.fix}` : ""}`, width));
+    const fix = f.fix ? ` Fix: ${f.fix}` : "";
+    // when a line is too long, the message is cut and the fix is kept: the fix is what the reader acts on
+    const head = `- ${f.severity.toUpperCase()} ${BT}${f.id}${BT}${at}${f.path && f.path !== "(the whole file)" ? ` ${BT}${f.path}${BT}` : ""}: ${withoutDoctor(f.message)}`;
+    out.push(clip(`${clip(head, Math.max(120, width - fix.length))}${fix}`, width));
   }
   if (important.length > shown.length) out.push(`- ... and ${important.length - shown.length} more (run ${BT}claude-settings-doctor lint${BT})`);
   return `${out.join("\n")}\n`;
@@ -141,7 +157,7 @@ export function renderExplain(m, { color = false } = {}) {
   }
   out.push(`${p.bold(m.path)}   ${m.type}${m.hasDefault ? `, default ${json(m.default)}` : ""}`);
   if (m.deprecated) out.push(p.yellow(`deprecated: ${m.deprecated}`));
-  if (m.description) { out.push(""); out.push(m.description); }
+  if (m.description) { out.push(""); out.push(...wrap(m.description, 100)); }
   if (m.enum) { out.push(""); out.push(`Allowed: ${m.enum.map(json).join(", ")}`); }
   if (m.examples.length) { out.push(""); out.push(`Example${m.examples.length === 1 ? "" : "s"}: ${m.examples.map((e) => clip(json(e), 100)).join("  ")}`); }
   if (m.children.length) { out.push(""); out.push(`Keys: ${m.children.join(", ")}${m.moreChildren ? `, and ${m.moreChildren} more` : ""}`); }

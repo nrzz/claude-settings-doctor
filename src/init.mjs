@@ -7,21 +7,10 @@
 import { parseJsonc, toValue } from "./jsonc.mjs";
 import { deprecation, firstSentence, loadSchema, nearest, vendored } from "./schema.mjs";
 import { deprecationAdvice } from "./lint.mjs";
+import { wrap } from "./report.mjs";
 
 const WIDTH = 100;
 const indent = (level) => "  ".repeat(level);
-
-function wrap(text, width) {
-  const lines = [];
-  for (const para of String(text).replace(/\r/g, "").split(/\n+/)) {
-    let line = "";
-    for (const word of para.trim().split(/\s+/).filter(Boolean)) {
-      if (line && line.length + 1 + word.length > width) { lines.push(line); line = word; } else line = line ? `${line} ${word}` : word;
-    }
-    if (line) lines.push(line);
-  }
-  return lines;
-}
 
 /** At most `max` characters of a description, cut after a sentence. */
 function shorten(text, max = 480) {
