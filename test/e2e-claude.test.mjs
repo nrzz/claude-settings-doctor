@@ -4,7 +4,7 @@
 //      built into settings.json is read;
 //   b. the order of the files (user, project, local) and how they combine: a value is replaced, objects merge key
 //      by key, the hooks of every file run, and `show` says what the binary did;
-//   c. the lint table (test/lint-table.mjs): `claude doctor` lists what the table says for each of the 88 settings,
+//   c. the lint table (test/lint-table.mjs): `claude doctor` lists what the table says for each of the 91 settings,
 //      and the whole file is ignored exactly when the lint says it is; which hooks run when an entry, a group or an
 //      event is wrong is what the lint says remains; env values become the strings the lint says;
 //   d. the plugin: it validates, /settings-doctor:check hands the model the lint report, its skill adds nothing to
@@ -33,6 +33,8 @@ const lintOf = (sb) => lintSettings(loadSettings(toolWorld(sb)));
 
 // The main request of a run: the one that carries the prompt
 const main = (api) => api.requests.find((r) => userText(r).includes("PROBE-MAIN")) || api.requests[0];
+// The request that carries a skill's text (a version may send other requests too, for a title or a quota check)
+const withSkill = (api) => api.requests.find((r) => textBlocks(r).some((b) => b.startsWith("Base directory for this skill")));
 
 /** Run `claude -p` in a sandbox whose settings files are `files` and say what it did: the model it asked for, the hooks that ran. */
 async function probe(label, files, { args = [], env = {}, prompt = "PROBE-MAIN hello" } = {}) {
@@ -366,15 +368,15 @@ test("the user-only skill adds nothing to a request that does not use it: no too
   const without = await fakeApi();
   const withPlugin = await fakeApi();
   try {
-    await runClaude(sb, without, ["-p", "hello", "--output-format", "json"]);
-    await runClaude(sb, withPlugin, ["-p", "hello", "--plugin-dir", ROOT, "--output-format", "json"]);
+    await runClaude(sb, without, ["-p", "PROBE-MAIN hello", "--output-format", "json"]);
+    await runClaude(sb, withPlugin, ["-p", "PROBE-MAIN hello", "--plugin-dir", ROOT, "--output-format", "json"]);
     // the two runs are the same but for the ids and the times that every request carries
     const plain = (r) => JSON.stringify(r).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<id>").replace(/\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(\.\d+)?Z?/g, "<time>");
-    const a = plain(without.requests[0]);
-    const b = plain(withPlugin.requests[0]);
+    const a = plain(main(without));
+    const b = plain(main(withPlugin));
     assert.ok(!b.includes("settings-doctor"), "nothing of the plugin is in the request");
     assert.ok(!b.includes("Check settings files"), "not even the skill's description");
-    assert.equal(JSON.stringify(withPlugin.requests[0].tools), JSON.stringify(without.requests[0].tools), "the tool list is the same");
+    assert.equal(JSON.stringify(main(withPlugin).tools), JSON.stringify(main(without).tools), "the tool list is the same");
     assert.equal(b.length, a.length, "the request has the same size with the plugin loaded");
     t.diagnostic(`plain prompt: ${a.length} characters without the plugin, ${b.length} with it; the string settings-doctor appears ${b.split("settings-doctor").length - 1} times`);
   } finally { await without.close(); await withPlugin.close(); }
@@ -388,8 +390,8 @@ test("/settings-doctor:check hands the model the lint report for the project, wh
   try {
     const r = await runClaude(sb, api, ["-p", "/settings-doctor:check", "--plugin-dir", ROOT, "--output-format", "json"]);
     assert.equal(r.code, 0, r.err);
-    assert.equal(api.requests.length, 1, "the skill reached the model, although the lint found problems (its command must not fail)");
-    const blocks = textBlocks(main(api));
+    assert.ok(withSkill(api), "the skill reached the model, although the lint found problems (its command must not fail)");
+    const blocks = textBlocks(withSkill(api));
     const skillText = blocks.find((b) => b.startsWith("Base directory for this skill"));
     assert.ok(skillText, `the skill text is in the request:\n${blocks.map((b) => b.slice(0, 80)).join("\n")}`);
     const commandText = blocks.find((b) => b.includes("<command-name>/settings-doctor:check</command-name>"));
@@ -417,7 +419,7 @@ test("/settings-doctor:check on a project with nothing wrong says so in one line
   const api = await fakeApi();
   try {
     await runClaude(sb, api, ["-p", "/settings-doctor:check", "--plugin-dir", ROOT, "--output-format", "json"]);
-    const skillText = textBlocks(main(api)).find((b) => b.startsWith("Base directory for this skill"));
+    const skillText = textBlocks(withSkill(api) || main(api)).find((b) => b.startsWith("Base directory for this skill"));
     assert.ok(skillText);
     if (!/run this first/.test(skillText)) assert.match(skillText, /No findings\./);
   } finally { await api.close(); }
@@ -432,7 +434,7 @@ test("the worst report the skill can hand over is capped, and its size is measur
   const api = await fakeApi();
   try {
     await runClaude(sb, api, ["-p", "/settings-doctor:check", "--plugin-dir", ROOT, "--output-format", "json"]);
-    const skillText = textBlocks(main(api)).find((b) => b.startsWith("Base directory for this skill"));
+    const skillText = textBlocks(withSkill(api) || main(api)).find((b) => b.startsWith("Base directory for this skill"));
     assert.ok(skillText);
     if (/run this first/.test(skillText)) return;
     t.diagnostic(`worst case built here: ${skillText.length} characters in the skill block, ${skillText.split("\n").length} lines, about ${Math.round(skillText.length / 4)} tokens by characters / 4`);
@@ -451,7 +453,10 @@ test("the skill's allowed-tools let the model run the command with no prompt (pe
       const r = await runClaude(sb, api, ["-p", "/settings-doctor:check PROBE-MAIN", "--plugin-dir", ROOT, "--output-format", "json", "--permission-mode", "default", "--max-turns", "3"], { env });
       assert.equal(r.code, 0, r.err);
       assert.deepEqual(r.result.permission_denials, [], `${tool}: nothing was refused`);
-      const results = api.requests.at(-1).messages.flatMap((m) => (Array.isArray(m.content) ? m.content : [])).filter((b) => b.type === "tool_result");
+      // each later request repeats the conversation so far: one result for the one call
+      const seen = new Map();
+      for (const b of api.requests.flatMap((rq) => rq.messages || []).flatMap((m) => (Array.isArray(m.content) ? m.content : []))) if (b.type === "tool_result") seen.set(b.tool_use_id, b);
+      const results = [...seen.values()];
       assert.equal(results.length, 1, `${tool}: the command ran`);
       assert.match(JSON.stringify(results[0].content), /## settings-doctor lint/, `${tool}: and printed the report`);
     } finally { await api.close(); }
@@ -465,8 +470,8 @@ test("on Windows, with the PowerShell tool and the default permission mode, the 
   try {
     const r = await runClaude(sb, api, ["-p", "/settings-doctor:check", "--plugin-dir", ROOT, "--output-format", "json", "--permission-mode", "default"], { env: { CLAUDE_CODE_USE_POWERSHELL_TOOL: "1", CLAUDE_CODE_GIT_BASH_PATH: "C:/nonexistent/bash.exe" } });
     assert.equal(r.code, 0, r.err);
-    assert.equal(api.requests.length, 1, "the skill reached the model");
-    const skillText = textBlocks(main(api)).find((b) => b.startsWith("Base directory for this skill"));
+    assert.ok(withSkill(api), "the skill reached the model");
+    const skillText = textBlocks(withSkill(api)).find((b) => b.startsWith("Base directory for this skill"));
     assert.ok(skillText.includes("## settings-doctor lint") || /run this first/.test(skillText), skillText);
   } finally { await api.close(); }
 });
@@ -507,7 +512,7 @@ test("when the shell tool is not allowed for the command, Claude Code hands the 
   try {
     const r = await runClaude(sb, api, ["-p", "/settings-doctor:check", "--plugin-dir", copy, "--output-format", "json"], { env: { CLAUDE_CODE_USE_POWERSHELL_TOOL: "1", CLAUDE_CODE_GIT_BASH_PATH: "C:/nonexistent/bash.exe" } });
     assert.equal(r.code, 0, r.err);
-    const skillText = textBlocks(main(api)).find((b) => b.startsWith("Base directory for this skill"));
+    const skillText = textBlocks(withSkill(api) || main(api)).find((b) => b.startsWith("Base directory for this skill"));
     assert.ok(skillText, "the skill reached the model");
     assert.match(skillText, /\[run this first, exactly as written, with the PowerShell tool and use its output: `node "[^"]+claude-settings-doctor\.mjs" lint --project "[^"]+" --markdown`\]\n\nIn at most 10 lines: each problem with its settings file and line, and the fix\./);
     assert.ok(skillText.includes(`--project "${fwd(sb.work)}"`), "the project folder is filled in");
