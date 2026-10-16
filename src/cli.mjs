@@ -22,10 +22,10 @@ Read (they change nothing):
            mistakes in the settings files that apply: a comment or a trailing comma (Claude Code
            ignores the whole file), keys the schema does not know, wrong types, bad values,
            deprecated keys, env values that are not strings, hook entries of the wrong shape,
-           repeated keys. --file checks one file (a .jsonc too). Exit 1 on an error or a warning.
-           --markdown is the short report the /settings-doctor:check skill hands to Claude (at
-           most 12 findings); it always exits 0, because Claude Code drops a skill whose command
-           fails
+           repeated keys, keys that only managed settings honor. --file checks one file (a
+           .jsonc too). Exit 1 on an error or a warning. --markdown is the short report the
+           /settings-doctor:check skill hands to Claude (at most 12 findings); it always exits
+           0, because Claude Code drops a skill whose command fails
   explain  <key> [--project <dir>]
            what the schema says about a key (permissions.defaultMode, hooks.PreToolUse): its type,
            default and description, and which file sets it now
