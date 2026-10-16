@@ -1,0 +1,15 @@
+{
+  "name": "settings-doctor",
+  "displayName": "Settings Doctor",
+  "version": "1.0.0",
+  "description": "Comments for your Claude Code settings, the merged settings with the file each value came from, and a lint against the schema. One user-only skill: /settings-doctor:check.",
+  "author": { "name": "Naresh Prabu" },
+  "homepage": "https://github.com/nrzz/claude-settings-doctor",
+  "repository": "https://github.com/nrzz/claude-settings-doctor",
+  "documentationUrl": "https://github.com/nrzz/claude-settings-doctor#readme",
+  "supportUrl": "https://github.com/nrzz/claude-settings-doctor/issues",
+  "privacyPolicyUrl": "https://github.com/nrzz/claude-settings-doctor#privacy",
+  "termsOfServiceUrl": "https://github.com/nrzz/claude-settings-doctor/blob/main/LICENSE",
+  "license": "MIT",
+  "keywords": ["settings", "jsonc", "json-schema", "linter", "configuration", "settings-json"]
+}
