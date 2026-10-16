@@ -1,0 +1,38 @@
+name: e2e
+
+# The checks that run the real Claude Code: what it does with a settings file that has a comment or a trailing
+# comma, how the user, project and local files combine, what `claude doctor` lists for each of the 88 settings in
+# test/lint-table.mjs, which hooks run when a hook list is wrong, and that the plugin validates and its skill hands
+# the model the lint report. They cost nothing: Claude Code talks to a fake server on 127.0.0.1. Optional by design:
+# if the binary cannot be installed, the checks skip. Weekly, so a Claude Code release that changes how it reads
+# settings shows up here.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  claude:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install the Claude Code CLI (the checks skip if this fails)
+        run: npm install -g @anthropic-ai/claude-code
+        continue-on-error: true
+      - run: claude --version
+        continue-on-error: true
+      - name: Settings, hooks and plugin checks against the real binary
+        run: node --test test/e2e-claude.test.mjs
+        env:
+          E2E_CLAUDE: claude
