@@ -62,7 +62,9 @@ Options for every command:
   -v, --version  the version
 
 Exit codes: 0 ok; 1 findings, a difference or a refusal; 2 a usage error or an unexpected error.
-Environment: CLAUDE_CONFIG_DIR (Claude's config folder), NO_COLOR.
+Environment: CLAUDE_CONFIG_DIR (Claude's config folder), NO_COLOR, and
+CLAUDE_SETTINGS_DOCTOR_MANAGED_DIR (the folder to read managed-settings.json from, instead of the
+system folder; the tests use it).
 It reads settings files, writes only with init, build, absorb, watch and restore (after a
 backup), and never uses the network.
 `;
@@ -125,7 +127,8 @@ function targetOf(o, cwd) {
   if (o.user && o.project !== null) throw new UsageError("--user is the user's file in the Claude config folder; it does not take --project");
   if (o.user) return { target: "user", project: cwd, flag: "--user" };
   if (o.local) return { target: "local", project: path.resolve(cwd, o.project || "."), flag: "--local" };
-  if (o.project !== null) return { target: "project", project: path.resolve(cwd, o.project), flag: `--project ${o.project}` };
+  // the flag as it is suggested to the person: a folder with a space in its name is quoted
+  if (o.project !== null) return { target: "project", project: path.resolve(cwd, o.project), flag: `--project ${/\s/.test(o.project) ? `"${o.project.replace(/"/g, '\\"')}"` : o.project}` };
   throw new UsageError(`${o.command} needs the settings file: --user, --project <dir> or --local`);
 }
 

@@ -581,3 +581,15 @@ test("the round a person makes: init, edit the commented file, build, Claude Cod
   assert.deepEqual(JSON.parse(w.read(w.projectFile)), data);
   assert.equal(w.exists(baselinePath(w.claude, w.projectFile)), true, "the record is in the Claude config folder");
 });
+
+test("the commands it suggests name the file the way it was given, and quote a folder with a space in its name", async () => {
+  const w = world("quoted", { project: { model: "p" } });
+  const spaced = path.join(w.base, "my shop");
+  fs.mkdirSync(path.join(spaced, ".claude"), { recursive: true });
+  fs.writeFileSync(path.join(spaced, ".claude", "settings.json"), '{"model": "m"}\n');
+  const r = await run(["init", "--project", spaced], w);
+  assert.equal(r.code, 0, r.all);
+  assert.ok(r.out.includes(`run: claude-settings-doctor build --project "${spaced}"`), r.out);
+  const plain = await run(["init", "--project", "."], w);
+  assert.match(plain.out, /run: claude-settings-doctor build --project \.$/m);
+});
