@@ -1,0 +1,9 @@
+{
+  "source": "https://json.schemastore.org/claude-code-settings.json",
+  "downloaded": "2026-10-16",
+  "bytes": 231533,
+  "sha256": "0ad8cf34c55f31c4f29d621d43ae4078c462589d9b5c5bcf8d96694a5ae666ba",
+  "properties": 142,
+  "licence": "Apache-2.0",
+  "licenceNote": "SchemaStore (https://github.com/SchemaStore/schemastore) is licensed under the Apache License 2.0; the text is in LICENSE next to this file."
+}
