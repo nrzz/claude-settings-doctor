@@ -24,6 +24,11 @@ export const HOOK_TYPES = ["command", "prompt", "agent", "http", "mcp_tool"];
  *  Code ignores the whole file. */
 export const FIELD_LEVEL = new Set(["hooks", "allowedMcpServers", "deniedMcpServers", "extraKnownMarketplaces", "managedMcpServers"]);
 
+/** Keys that Claude Code honors only in managed settings. In a user, project or local file it ignores them
+ *  whatever their value (claude doctor, 2.1.295 and 2.1.299, for a string, an array and an array of objects:
+ *  "is only honored from managed settings and was ignored here"), and applies the rest of the file. */
+export const MANAGED_ONLY = new Set(["managedMcpServers"]);
+
 /** Keys (and nested keys) where Claude Code 2.1.295 said nothing about a wrong type or a value outside the
  *  schema's list: keys it keeps elsewhere or does not know yet. The schema is newer than that binary here. A
  *  path matches when it is one of these or inside one. */

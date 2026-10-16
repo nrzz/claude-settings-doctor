@@ -134,6 +134,15 @@ test("nothing in the package can reach the network or start another program", ()
   for (const f of [...files("src", ".mjs"), ...files("bin", ".mjs")]) assert.doesNotMatch(read(f), banned, f);
 });
 
+test("src/write.mjs is the only code that writes: nothing else in the package calls a function that changes a file", () => {
+  const writes = /\b(?:writeFile|appendFile|copyFile|rename|unlink|rmdir|rm|mkdir|truncate|symlink|link|chmod|utimes)(?:Sync)?\s*\(|\bcreateWriteStream\b|\bfs\.promises\b/;
+  for (const f of [...files("src", ".mjs"), ...files("bin", ".mjs")]) {
+    if (f.split(path.sep).join("/") === "src/write.mjs") continue;
+    assert.doesNotMatch(read(f), writes, `${f} must not write: only src/write.mjs does`);
+  }
+  assert.match(read("src/write.mjs"), /fs\.writeFileSync/);
+});
+
 test("scripts/update-schema.mjs is the one place that uses the network, and it is not shipped", () => {
   const text = read("scripts/update-schema.mjs");
   assert.match(text, /\bfetch\(/);
@@ -190,8 +199,11 @@ test("the CI workflows: the suite on three systems and four Node versions, and t
   assert.match(ci, /run: npm test/);
   assert.match(ci, /uses: actions\/checkout@/);
   assert.match(ci, /uses: actions\/setup-node@/);
+  // a job that hangs ends in minutes: a watcher that a failed test left open once held a macOS job for 21 minutes
+  assert.match(ci, /timeout-minutes: \d+/);
   const e2e = read(".github/workflows/e2e.yml");
   for (const part of ["name: e2e", "ubuntu-latest, macos-latest", "npm install -g @anthropic-ai/claude-code", "continue-on-error: true", "E2E_CLAUDE: claude", "test/e2e-claude.test.mjs", "schedule:", "workflow_dispatch"]) assert.ok(e2e.includes(part), part);
+  assert.match(e2e, /timeout-minutes: \d+/);
   assert.ok(!e2e.includes("windows"));
 });
 
@@ -288,7 +300,8 @@ test("the usage block of the README is the help text of the CLI, and nothing is 
 test("the numbers the README quotes are the numbers of the code: the table, the cap, the instruction, the description, the schema", async () => {
   const readme = read("README.md");
   const { ROWS } = await import("./lint-table.mjs");
-  assert.ok(readme.includes(`holds ${ROWS.length} settings with one thing wrong in each`), `the lint table has ${ROWS.length} rows`);
+  const fine = ROWS.filter((r) => r.expect.length === 0).length;
+  assert.ok(readme.includes(`holds ${ROWS.length} settings: ${ROWS.length - fine} with something wrong in them and ${fine} that the binary takes as they are`), `the lint table has ${ROWS.length} rows, ${fine} of them fine`);
   assert.ok(readme.includes(`for every one of the ${ROWS.length},`));
   // the cap of the markdown report
   const w = world("readme-cap");

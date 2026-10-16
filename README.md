@@ -2,16 +2,26 @@
 
 [![test](https://github.com/nrzz/claude-settings-doctor/actions/workflows/test.yml/badge.svg)](https://github.com/nrzz/claude-settings-doctor/actions/workflows/test.yml) [![e2e](https://github.com/nrzz/claude-settings-doctor/actions/workflows/e2e.yml/badge.svg)](https://github.com/nrzz/claude-settings-doctor/actions/workflows/e2e.yml) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![node >= 18](https://img.shields.io/badge/node-%3E%3D18-339933.svg) ![dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen.svg) [![part of the Claude Code toolkit](https://img.shields.io/badge/Claude%20Code-toolkit-d97757.svg)](https://github.com/nrzz/claude-code-toolkit)
 
-Claude Code's settings files take no comments: [#17968](https://github.com/anthropics/claude-code/issues/17968) asks for JSONC (127 reactions, open since January) and [#4475](https://github.com/anthropics/claude-code/issues/4475) for a `description` field (25 reactions, as read on 16 October 2026). A comment or a trailing comma does not get an error: Claude Code ignores the whole file, and a `claude -p` run printed nothing about it. A key it does not know is ignored without a word. A value of the wrong type costs the whole file in most keys, and `claude doctor` is where it is listed. The four settings files (managed, user, project and local), with flags and plugin defaults around them, merge into one object that no command shows. claude-settings-doctor gives your settings comments: you write `settings.jsonc`, `build` writes the `settings.json` that Claude Code reads, and `absorb` takes what Claude Code wrote into `settings.json` (an "Always allow" rule, a `/config` change) back into the commented file. It shows the merged settings with the file each value came from, lints every file against the schema and says what Claude Code does about each mistake, and explains a key. It is a plain Node program that runs outside Claude, so it costs no tokens.
+Claude Code's settings files take no comments: [#17968](https://github.com/anthropics/claude-code/issues/17968) asks for JSONC (127 reactions, open since January) and [#4475](https://github.com/anthropics/claude-code/issues/4475) for a `description` field (25 reactions, as read on 16 October 2026). A comment or a trailing comma gets no error in a `claude -p` run: Claude Code ignores the whole file and prints nothing about it. `claude doctor` lists the file. A key it does not know is ignored without a word. A value of the wrong type costs the whole file in most keys, and `claude doctor` is where it is listed. The four settings files (managed, user, project and local), with flags and plugin defaults around them, merge into one object that no command in `claude --help` shows.
+
+claude-settings-doctor gives your settings comments. You write `settings.jsonc`. `build` writes the `settings.json` that Claude Code reads. `absorb` takes what Claude Code wrote into `settings.json` (an "Always allow" rule, a `/config` change) back into the commented file. The tool shows the merged settings with the file each value came from, lints every file against the schema, and explains a key. Where a mistake costs something, the lint says what Claude Code does about it. It is a plain Node program that runs outside Claude, so it costs no tokens.
 
 ## What you get
 
 - `show`: the settings Claude Code merges (managed, local, project, user), every value with the file it came from and what a higher file shadows, a list as its items with a file for each, and the files Claude Code ignores, with the reason.
-- `lint`: a comment or a trailing comma (Claude Code ignores the whole file), keys the schema does not know with the near name, values of the wrong type or outside the allowed list, deprecated keys, `env` values that are not strings, hook entries, groups and events of the wrong shape, a hook matcher that is not a regular expression, and a key written twice. Each finding has the file, line, column and key path, and says what Claude Code does about it.
+- `lint` finds:
+  - a comment or a trailing comma (Claude Code ignores the whole file);
+  - keys the schema does not know, with the near name;
+  - values of the wrong type or outside the allowed list, and deprecated keys;
+  - `env` values that are not strings;
+  - hook entries, groups and events of the wrong shape, and a hook matcher that is not a regular expression;
+  - a key written twice, and a key that only managed settings honor.
+
+  Each finding has the file and the key path, and the line and column when there is one. For a mistake that costs something it says what Claude Code does about it.
 - `explain <key>`: what the schema says about a key (its type, default, allowed values and description), which files set it now, and how they combine: the highest file wins a value, lists are joined, objects merge key by key.
-- `init`, `build`, `check`, `absorb`, `watch`: the commented source. `init` writes `settings.jsonc` next to a settings file, every key annotated from the schema. `build` writes `settings.json` from it, saving the old file first, and refuses when `settings.json` changed since the last build. `check` exits 1 when `settings.json` holds other settings than `build` would write, for CI and pre-commit. `absorb` takes Claude Code's own edits back into `settings.jsonc`, comments kept. `watch` builds on every save.
+- `init`, `build`, `check`, `absorb`, `watch`: the commented source. `init` writes `settings.jsonc` next to a settings file, with a comment above each key the schema describes. `build` writes `settings.json` from it, saving the old file first, and refuses when `settings.json` changed since the last build. `check` exits 1 when `settings.json` holds other settings than `build` would write, for CI and pre-commit. `absorb` takes Claude Code's own edits back into `settings.jsonc`, comments kept. `watch` builds on every save.
 - `restore`: puts the newest backup of a settings file back, and can itself be undone.
-- `/settings-doctor:check`, a plugin skill that hands Claude the `lint` report.
+- `/settings-doctor:check`, a plugin skill that hands Claude the short form of the `lint` report (`lint --markdown`).
 
 ## What it costs in tokens
 
@@ -19,7 +29,7 @@ Claude Code's settings files take no comments: [#17968](https://github.com/anthr
 | --- | --- | --- |
 | The tool: every command, `--json`, `--markdown`, `watch`, `check` in CI | 0 | It reads and writes settings files. It never calls Claude, opens no network connection and starts no process |
 | The skill in the model's request | 0 | `/settings-doctor:check` is user-only (`disable-model-invocation: true`) and its description is `Check settings files.`: 21 characters, about 5 tokens by characters / 4. With the plugin loaded, the request Claude Code sent for a plain prompt had the same size with and without it (68,582 characters on Claude Code 2.1.295, 69,112 on 2.1.299, 64,376 on 2.1.301 on Linux), the same tool list, and not one occurrence of `settings-doctor` (checked against a fake API, see below). `claude plugin details` still projects about 11 tokens "always-on" for the skill; that capture does not bear it out |
-| `/settings-doctor:check` | about 340 tokens once, at most about 1,000 | The model receives the lint report and a 251-character instruction, and replies in at most 10 lines. For a project with 3 findings that was 1,254 characters in the skill block and 109 in the command block on Windows: 1,363, about 341 tokens by characters / 4 (the skill block holds the project's path: 1,225 characters on Linux and 1,330 on macOS in CI). The report is capped at 12 findings and 300 characters a line; the biggest one I could build (a user file and a project file with 40 long unknown keys each, and a local file with a comment) was 4,091 characters in 20 lines, about 1,023 tokens. These are characters divided by 4, an estimate, not a count by Claude's tokenizer. The free route is the same report in a terminal: `claude-settings-doctor lint` |
+| `/settings-doctor:check` | about 340 tokens once; about 1,000 in the worst case I built | The model receives the lint report and a 251-character instruction that asks for a reply of at most 10 lines. For a project with 3 findings that was 1,254 characters in the skill block and 109 in the command block on Windows: 1,363, about 341 tokens by characters / 4 (the skill block holds the project's path: 1,225 characters on Linux and 1,330 on macOS in CI). The report is capped at 12 findings and 300 characters a line. The worst case I built (a user file and a project file with 40 long unknown keys each, and a local file with a comment) was 4,091 characters in 20 lines, about 1,023 tokens. These are characters divided by 4, an estimate, not a count by Claude's tokenizer. The same findings in a terminal cost nothing: `claude-settings-doctor lint` |
 
 ## Install
 
@@ -47,7 +57,7 @@ node claude-settings-doctor/bin/claude-settings-doctor.mjs lint --project .
 /plugin install settings-doctor@claude-code-toolkit
 ```
 
-Then type `/settings-doctor:check`. It runs `lint` for the current project and answers in at most 10 lines: each problem with its settings file and line, and the fix. It edits nothing until you agree. To try the plugin from a clone before it is in the marketplace: `claude --plugin-dir ./claude-settings-doctor`.
+Then type `/settings-doctor:check`. It runs `lint --markdown` for the current project and asks Claude to answer in at most 10 lines: each problem with its settings file and line, and the fix. It also asks Claude to edit nothing until you agree. To try the plugin from a clone before it is in the marketplace: `claude --plugin-dir ./claude-settings-doctor`.
 
 ## Use
 
@@ -74,7 +84,8 @@ Read (they change nothing):
 
 The commented source (each takes --user, --project <dir> or --local to name the settings file):
   init     [--force] [--dry-run]
-           write settings.jsonc next to settings.json, every key annotated from the schema
+           write settings.jsonc next to settings.json, with a comment above each key the schema
+           describes
   build    [--force] [--dry-run]
            write settings.json from settings.jsonc: comments and trailing commas gone, keys in
            order, two-space indentation; the old file is saved first; refuses when settings.json
@@ -88,14 +99,15 @@ The commented source (each takes --user, --project <dir> or --local to name the 
            change) into settings.jsonc, comments kept; the old settings.jsonc is saved first
   watch    [--poll <ms>] [--dry-run]
            build now, and again on every save of settings.jsonc; --poll looks at the file every
-           <ms> milliseconds, for a place where folder events do not arrive
+           <ms> milliseconds (50 or more), for a place where folder events do not arrive
   restore  [--jsonc] [--list] [--dry-run]
            put the newest backup back (of settings.jsonc with --jsonc); --list names the backups
 
 Files: --user is <config folder>/settings.json (CLAUDE_CONFIG_DIR, else ~/.claude);
 --project <dir> is <dir>/.claude/settings.json; --local is <dir>/.claude/settings.local.json
-(in the folder --project names, else the folder you are in). The commented source sits next
-to each, with the extension .jsonc. Claude Code reads settings.json only.
+(<dir> is the folder --project names, else the folder you are in; on Linux and macOS in a git
+repository --local is at the root of the repository). The commented source sits next to
+each, with the extension .jsonc. Claude Code reads settings.json only.
 
 Options for every command:
   --json         one JSON document on stdout
@@ -107,15 +119,15 @@ Exit codes: 0 ok; 1 findings, a difference or a refusal; 2 a usage error or an u
 Environment: CLAUDE_CONFIG_DIR (Claude's config folder), NO_COLOR, and
 CLAUDE_SETTINGS_DOCTOR_MANAGED_DIR (the folder to read managed-settings.json from, instead of the
 system folder; the tests use it).
-It reads settings files, writes only with init, build, absorb, watch and restore (a file they
-replace is saved next to itself first), and never uses the network.
+It reads settings files, writes only with init, build, absorb, watch and restore (a settings
+file they replace is saved next to itself first), and never uses the network.
 ```
 
 Every command takes `--json` (one JSON document on stdout, see the end of this section) and `--no-color` (or set `NO_COLOR`); colour is used only on a terminal. The exit codes are 0 for ok, 1 for findings, a difference or a refusal, and 2 for a usage error. The options a command does not take are refused by name.
 
 ### `show`
 
-`show [--project <dir>]` reads the managed, user, project and local files that apply to the folder (the current one, or `--project`), and prints them from the highest precedence down with their state: not found, read, empty, unreadable, or ignored by Claude Code and why. Then every value of the merge with the file it came from; a value a higher file replaced is listed under it as shadowed; a list is its items, each with its file (a rule in two files is one item, with both named); a key the schema does not list is tagged. It ends with what it does not read.
+`show [--project <dir>]` reads the managed, user, project and local files that apply to the folder (the current one, or `--project`), and prints them from the highest precedence down with their state: not found, read, empty, unreadable, or ignored by Claude Code and why. Then every value of the merge with the file it came from. A value a higher file replaced is listed under it as shadowed. A list is its items, each with its file (a rule in two files is one item, with both named). A key the schema does not list is tagged, at the first two levels of its path (`lint` looks at every level). `show` ends with what it does not read.
 
 ```text
 claude-settings-doctor show
@@ -161,7 +173,11 @@ The local file has a comment, so Claude Code ignores all of it, and `show` leave
 
 ### `lint`
 
-`lint [--project <dir>] [--file <path>] [--markdown]` checks every file that applies. `--file` checks one file; a `.jsonc` may have comments and trailing commas, and is still held to the schema. The exit code is 1 when there is an error or a warning, 0 otherwise (a note does not count). A finding has one of three severities: an error (Claude Code ignores something: the whole file, a field, an entry, a group), a warning (Claude Code keeps it but it is probably not what you meant), a note.
+`lint [--project <dir>] [--file <path>] [--markdown]` checks every file that applies. `--file` checks one file; a `.jsonc` may have comments and trailing commas, and is still held to the schema. The exit code is 1 when there is an error or a warning, 0 otherwise (a note does not count). A finding has one of three severities:
+
+- an error: Claude Code drops something the file says (the whole file, a field, an entry, a group or an event);
+- a warning: the file still applies, but something in it is probably not what you meant, and Claude Code may ignore just that key (an unknown key, a key written twice, a matcher that never matches);
+- a note: worth knowing, nothing is lost.
 
 ```text
 claude-settings-doctor lint
@@ -199,9 +215,9 @@ schema    SchemaStore's claude-code-settings.json, downloaded 2026-10-16
 2 errors, 3 warnings, 0 notes in 3 files
 ```
 
-The ids are `invalid-json`, `not-an-object`, `empty-file`, `duplicate-key`, `unknown-key`, `wrong-type`, `bad-value`, `deprecated`, `duplicate-item`, `env-not-string`, `env-name`, `hook-event`, `hook-shape`, `hook-matcher`, `jsonc-out-of-date` (a `settings.jsonc` that its `settings.json` is behind), `unreadable` and `not-checked` (a place where the schema uses a keyword the checker does not judge, said once per file). What Claude Code does about each kind of mistake is what the real binary did when it was put to it; "What was verified, and how" says how.
+The ids are `invalid-json`, `not-an-object`, `empty-file`, `duplicate-key`, `unknown-key`, `wrong-type`, `bad-value`, `deprecated`, `duplicate-item`, `env-not-string`, `env-name`, `managed-only`, `hook-event`, `hook-shape`, `hook-matcher`, `jsonc-out-of-date`, `unreadable` and `not-checked`. Two need a word. `jsonc-out-of-date` is a `settings.jsonc` that does not match its `settings.json`: it is behind it, it cannot be built, or `settings.json` is not there yet (a difference in layout alone is a note). `not-checked` is a place where the schema uses a keyword the checker does not judge, said once per file. Where a mistake costs something, what Claude Code does about it is what the real binary did when it was put to it; "What was verified, and how" says how. A few kinds say what to do and not what Claude Code does: `deprecated`, `duplicate-item`, `empty-file`, `jsonc-out-of-date` and `not-checked`.
 
-With `--markdown` the report is the short form the skill hands to Claude: the errors and warnings only, at most 12 of them, each line at most 300 characters (the message is cut before the fix is), and `...and N more` when there are more. It exits 0 whatever it finds, because Claude Code drops a skill whose command fails (seen on 2.1.295: no request reached the model). The same project:
+With `--markdown` the report is the short form the skill hands to Claude. It holds the errors and warnings only, at most 12 of them, each line at most 300 characters (the message is cut before the fix is). When there are more, a last line says ``- ... and N more (run `claude-settings-doctor lint`)``. It exits 0 whatever it finds. The reason: a skill whose command exits 1 never reaches the model. A copy of the skill that ran `lint` without `--markdown` on a project with a finding sent no request on Claude Code 2.1.295 and 2.1.299, and the same skill with `--markdown` did. The same project:
 
 ```text
 claude-settings-doctor lint --markdown
@@ -219,7 +235,7 @@ claude-settings-doctor lint --markdown
 
 ### `explain`
 
-`explain <key> [--project <dir>]` takes a key as `permissions.defaultMode`, `hooks.PreToolUse[0].matcher` or `env.MY_VARIABLE`. It prints the schema's type, default, allowed values, examples and description, the keys inside an object, and the files that set the key now: which wins, which are shadowed, which Claude Code ignores and why, and for a list or an object that all the files contribute. A key the schema does not know exits 1 with the nearest names; when the first part of a path is the typo, it says so.
+`explain <key> [--project <dir>]` takes a key as `permissions.defaultMode`, `hooks.PreToolUse[0].matcher` or `env.MY_VARIABLE`. It prints the schema's type, default, allowed values, examples and description, and the keys inside an object. Then it lists the files that set the key now: which wins, which are shadowed, and which Claude Code ignores and why. For a list or an object it says that all the files contribute. A key the schema does not know exits 1 with the nearest names. When the first part of a path is the typo, it says so.
 
 ```text
 claude-settings-doctor explain model
@@ -269,7 +285,7 @@ Did you mean "cleanupPeriodDays"?
 
 ### `init`
 
-`init (--user | --project <dir> | --local) [--force] [--dry-run]` writes `settings.jsonc` next to the settings file (`settings.local.jsonc` next to `settings.local.json`). The values, the order of the keys and the layout are those of the settings file; above each key the schema describes there is a comment with its description, its type, its default and the values it allows; a key the schema does not list gets a comment that says so, with the near name; inside a list only the first item is annotated. It refuses when the `.jsonc` is already there (`--force` replaces it after a backup of the old one) and when the settings file is not valid JSON (Claude Code ignores it too). The settings file is not touched.
+`init (--user | --project <dir> | --local) [--force] [--dry-run]` writes `settings.jsonc` next to the settings file (`settings.local.jsonc` next to `settings.local.json`). The values and the order of the keys are those of the settings file. The layout is the one `build` writes: two spaces, and one item of a list on each line. Above each key the schema describes there is a comment with its description, its type, its default and the values it allows. A key the schema does not list gets a comment that says so, with the near name. Inside a list only the first item is annotated, and the names under `env` get no comment. `init` refuses when the `.jsonc` is already there (`--force` replaces it after a backup of the old one) and when the settings file is not valid JSON (Claude Code ignores it too). The settings file is not touched.
 
 ```text
 claude-settings-doctor init --project .
@@ -311,7 +327,13 @@ The start of the file it wrote:
 
 ### `build`
 
-`build (--user | --project <dir> | --local) [--force] [--dry-run]` writes the settings file from its `.jsonc`: the comments and trailing commas gone, the keys in the order they were written, two-space indentation, a final newline; numbers and strings exactly as written. The old file is saved next to it first. It refuses, writing nothing, when the `.jsonc` is missing, is not JSON with comments, or writes a key twice (Claude Code keeps only the last, so `build` will not choose for you), and when the settings file changed since the last build, absorb or init (a rule Claude Code added would be thrown away): the refusal lists what changed and says to run `absorb`, or to use `--force`. A settings file that only looks different (another layout, another order of keys or of rules) does not stop it.
+`build (--user | --project <dir> | --local) [--force] [--dry-run]` writes the settings file from its `.jsonc`: the comments and trailing commas gone, the keys in the order they were written, two-space indentation, a final newline, and numbers and strings exactly as written. The old file is saved next to it first. `build` refuses, writing nothing, when:
+
+- the `.jsonc` is missing, is not JSON with comments, or writes a key twice (Claude Code keeps only the last, so `build` will not choose for you);
+- the settings file is not valid JSON, so Claude Code cannot read it either (`--force` replaces it after a backup);
+- the settings file changed since the last build, absorb or init. A rule Claude Code added would be thrown away, so the refusal lists what changed and says to run `absorb`, or to use `--force`.
+
+A settings file that only looks different (another layout, another order of keys or of rules) does not stop it.
 
 ```text
 claude-settings-doctor build --project . --dry-run
@@ -375,7 +397,7 @@ Run claude-settings-doctor build --project . to write it, or claude-settings-doc
 
 ### `absorb`
 
-`absorb (--user | --project <dir> | --local) [--dry-run]` takes what changed in `settings.json` since the last build, absorb or init into `settings.jsonc`, by editing its text: the comments, blank lines, indentation, line endings and the order of keys stay, and what is added goes after the last key or item in the layout of the others. A key or item taken out goes with the comments right above it and the one after it on its line. A value you changed yourself in `settings.jsonc` is yours: it is reported as a conflict (exit 1) and not overwritten, and the record of the last build is not moved until you decide. A change inside an item of a list (a hook group whose matcher changed, a hook added to a group) is made in the item, where it is, so its comments stay and it does not move to the end. With no record of the last build only additions are taken, and the rest is listed as left alone. The old `settings.jsonc` is saved first.
+`absorb (--user | --project <dir> | --local) [--dry-run]` takes what changed in `settings.json` since the last build, absorb or init into `settings.jsonc`, by editing its text. The comments, blank lines, indentation, line endings and the order of keys stay. What is added goes after the last key or item, in the layout of the others. A key or item taken out goes with the comments right above it and the one after it on its line. A value you changed yourself in `settings.jsonc` is yours: it is reported as a conflict (exit 1) and not overwritten, and the record of the last build is not moved until you decide. A change inside an item of a list (a hook group whose matcher changed, a hook added to a group) is made in the item, where it is, so its comments stay and it does not move to the end. With no record of the last build only additions are taken, and the rest is listed as left alone. The old `settings.jsonc` is saved first.
 
 While `settings.json` holds changes that `settings.jsonc` has not, `build` refuses to write over them:
 
@@ -417,7 +439,7 @@ The old settings.jsonc is saved as /home/me/shop/.claude/settings.jsonc.bak-sett
 
 ### `watch`
 
-`watch (--user | --project <dir> | --local) [--poll <ms>] [--dry-run]` builds once and then again every time `settings.jsonc` is saved, until you press Ctrl+C. It watches the folder, not the file, so an editor that saves by writing a new file and renaming it over the old one is seen, and saves that come close together are one build. A build that is refused (a typo in `settings.jsonc`, a `settings.json` that changed since the last build) is reported and the watching goes on, with `settings.json` as it was. `--poll <ms>` looks at the file every so many milliseconds instead, for a place where folder events do not arrive. It exits 1 if the first build was refused or there is no folder to watch, and 0 otherwise.
+`watch (--user | --project <dir> | --local) [--poll <ms>] [--dry-run]` builds once and then again every time `settings.jsonc` is saved, until you press Ctrl+C. It watches the folder, not the file, so an editor that saves by writing a new file and renaming it over the old one is seen, and saves that come close together are one build. A build that is refused (a typo in `settings.jsonc`, a `settings.json` that changed since the last build) is reported and the watching goes on, with `settings.json` as it was. `--poll <ms>` (50 or more) looks at the file every so many milliseconds instead, for a place where folder events do not arrive. It exits 1 if the first build was refused or there is no folder to watch, and 0 otherwise.
 
 ```text
 claude-settings-doctor watch --project .
@@ -451,7 +473,7 @@ settings.jsonc was not changed. Run claude-settings-doctor absorb --project . to
 
 ### The JSON documents
 
-Every command takes `--json` and then prints one JSON document and nothing else, also for a usage error (`{ "ok": false, "error": "..." }`, exit 2). Paths in a document are the paths of the system it ran on.
+Every command takes `--json` and then prints one JSON document and nothing else, also for a usage error (`{ "ok": false, "error": "..." }`, exit 2). `watch` prints one document for each build, on its own line. Paths in a document are the paths of the system it ran on. The shapes below name the fields that are always there and mark the ones that are not with `?`.
 
 ```text
 show     { project, configDir, configSource, schema: { downloaded, source },
@@ -459,19 +481,28 @@ show     { project, configDir, configSource, schema: { downloaded, source },
            entries: [ { path, keyPath, value, source, shadowed: [ { source, value } ], items?, inSchema } ],
            tree, counts: { entries, shadowed, findings }, notRead }
 lint     { project, configDir, configSource, schema,
-           findings: [ { id, severity, effect, scope, file, display, line, column, path, keyPath, message, fix? } ],
-           files: [ { scope, label, path, display, rank, exists, findings, ignored } ],
+           findings: [ { id, severity, effect, scope, file, display, line, column, path, keyPath, message, fix?, suggestions? } ],
+           files: [ { scope, label, path, display, rank, exists, findings, ignored, notChecked? } ],
            counts: { error, warning, note } }
-explain  { key, path, keyPath, found, type, description, summary, default, hasDefault, enum, examples, deprecated,
-           children, setBy: [ { scope, label, display, path, rank, value, ignored } ], winner, combine, merged, schema }
-         (a key the schema lacks: found false, unknown, unknownAt, suggestions)
+         (with --file: { project, file, findings, counts, schema,
+           files: [ { scope, label, path, display, exists, findings, effective } ] })
+explain  { key, path, keyPath, schema, found, type, description, summary, default?, hasDefault, enum, examples, deprecated,
+           children, moreChildren, setBy: [ { scope, label, display, path, rank, value, ignored } ], winner, combine,
+           merged, mergedCount }
+         (a key the schema lacks: key, path, keyPath, schema, found false, unknownAt, unknown, suggestions, listed)
 init, build, check, absorb, restore, watch
          { action, ok, refused, dryRun, scope, file, source, lines, notes, ...what the action did }
-         (build: changed, backup, changes; check: differs, layoutOnly, changes; absorb: applied, skipped,
-         conflicts, unabsorbed, pending, backup; restore: restored, from, savedCurrent, backups)
+         (init: backup, annotated, unknown, text; build: changed, backup, changes; check: differs, layoutOnly, changes;
+         absorb: backup, applied, skipped, conflicts, unabsorbed, pending, baseline;
+         restore: restored, from, savedCurrent, backups)
 ```
 
-- `effect` says what Claude Code does about a finding: `file` (the whole file is ignored), `field`, `event`, `group` or `entry` (that part is dropped), `key` (the key is ignored), `coerced` (a value is turned into a string) or `none`.
+- `effect` says what Claude Code does about a finding:
+  - `file`: the whole file is ignored;
+  - `field`, `event`, `group` or `entry`: that part is dropped;
+  - `key`: the key is ignored;
+  - `coerced`: a value is turned into a string;
+  - `none`: the finding is not about something Claude Code drops.
 - `source` is the file a value came from: `{ scope, label, display, path, rank }`. `scope` is `managed`, `local`, `project` or `user`; a higher `rank` wins.
 - `combine` in `explain` is `replace`, `join` (lists) or `merge` (objects).
 
@@ -479,48 +510,69 @@ init, build, check, absorb, restore, watch
 
 It reads, on your machine only:
 
-- the settings files that apply, in the order Claude Code gives them (highest first): `managed-settings.json` and `managed-settings.d/*.json` in the system folder (`C:\Program Files\ClaudeCode` on Windows, `/Library/Application Support/ClaudeCode` on macOS, `/etc/claude-code` on Linux), `<project>/.claude/settings.local.json`, `<project>/.claude/settings.json`, and `<config folder>/settings.json`, where the config folder is `$CLAUDE_CONFIG_DIR` or `~/.claude`. In a git repository on Linux and macOS it also reads the local file at the repository root, because Claude Code does (Claude Code 2.1.301 in CI read the local files of both `repo/.claude` and `repo/sub/.claude` for a session started in `repo/sub`); on Windows (2.1.295 and 2.1.299) it read only the one of the folder it started in. The project file is the folder's own everywhere.
-- the `.jsonc` next to each: `settings.json` has `settings.jsonc`, `settings.local.json` has `settings.local.jsonc`. Claude Code never reads them (a `settings.jsonc` alone changed nothing in the binary).
+- the settings files that apply, in the order Claude Code gives them (highest first): `managed-settings.json` and `managed-settings.d/*.json` in the system folder (`C:\Program Files\ClaudeCode` on Windows, `/Library/Application Support/ClaudeCode` on macOS, `/etc/claude-code` on Linux), `settings.local.json`, `<project>/.claude/settings.json`, and `<config folder>/settings.json`, where the config folder is `$CLAUDE_CONFIG_DIR` or `~/.claude`.
+- the local file, which is `<project>/.claude/settings.local.json`. On Linux and macOS in a git repository Claude Code also reads the one at the repository root: Claude Code 2.1.301 in CI read the local files of both `repo/.claude` and `repo/sub/.claude` for a session started in `repo/sub`. On Windows (2.1.295 and 2.1.299) it read only the one of the folder it started in. The project file is the folder's own everywhere. The tool leaves out the root file when the root is your home folder or belongs to another user. That rule comes from claude-permission-doctor's loader, and it was not put to the binary here.
+- the `.jsonc` next to each: `settings.json` has `settings.jsonc`, `settings.local.json` has `settings.local.jsonc`. Claude Code does not read them: a model written only in a `settings.jsonc` in the user, the project or the local place changed nothing in the binary.
 - its own copy of the schema in `src/schema/`: SchemaStore's `claude-code-settings.json`, 142 top-level keys, downloaded 2026-10-16, under the Apache-2.0 licence (the text is next to it). The schema is community-maintained and can lag a Claude Code release, so every report says which download it used, and a key that is new may show as unknown. `scripts/update-schema.mjs` downloads a newer one; it is run by hand and is not part of the package.
 
-How the files combine, as `show` and `explain` apply it: the files are merged from the lowest precedence up (user, project, local, then managed); objects merge key by key, the higher file winning each key; lists are joined and an item that is already there is not added twice; any other value is replaced by the higher file; a value of another type replaces whatever was there. A file Claude Code ignores is left out of the merge, and what Claude Code drops from a file it keeps (a hook entry, a group, an event, a field) is left out too.
+How the files combine, as `show` and `explain` apply it: the files are merged from the lowest precedence up (user, project, local, then managed). Objects merge key by key, the higher file winning each key. Lists are joined, and an item that is already there is not added twice. Any other value is replaced by the higher file, also when it is of another type. The binary agreed on the first two rules and on the joining of lists, and it ran a hook that several files hold once. The other rules are the documentation's, and "Not verified" says so. A file Claude Code ignores is left out of the merge. What Claude Code drops from a file it keeps (a hook entry, a group, an event, a field) is left out too.
 
 It writes only with `init`, `build`, `absorb`, `watch` and `restore`, and only the file you named with `--user`, `--project` or `--local` (or its `.jsonc`), the backups of it, and a record of the last build:
 
 - **A backup first**, next to the file: `settings.json.bak-settings-doctor-<timestamp>` (local time, `-1`, `-2` when the name is taken). `restore` puts the newest back and can itself be undone. The backups are the file byte for byte.
-- **A temporary file and a rename**, so nobody sees half a file; the mode of the file is kept; a symlink to the file is followed, so the link stays a link; when the rename cannot be done (another volume, a mount point) the text is written over the file in place.
+- **A temporary file and a rename**, so nobody sees half a file. The mode of the file is kept. A symlink to the file is followed, so the link stays a link. When the rename cannot be done (another volume, a mount point) the text is written over the file in place.
 - **A record of the last build**, one small file for each settings file, in `<config folder>/settings-doctor/`: the text of `settings.json` as of the last `build`, `absorb` or `init`. It is how `absorb` tells what Claude Code changed from what you did, and how `build` knows that `settings.json` changed. Without it `build` still works (after a backup) and `absorb` takes additions only.
 - **Nothing else**: never managed settings, never `~/.claude.json`, never a transcript. A settings file that is not valid JSON is left alone: `init`, `absorb` and `build` refuse it (`build --force` replaces it after a backup). `build` also refuses a valid one that changed since the last build.
 - **`--dry-run`** on every command that writes, and `check` writes nothing.
 
 ### Privacy
 
-It reads settings files, and the `.jsonc` files next to them, on your machine and nothing else. It writes only what is described above, on the commands that write, and saves a settings file next to itself before it replaces it. It never uses the network, starts no process, has no telemetry, no account and no cache outside `<config folder>/settings-doctor/`, and sends nothing anywhere. A test fails if any file under `src/` or `bin/` imports anything but `node:crypto`, `node:fs`, `node:os` or `node:path`, opens a socket or starts a process. The plugin's skill runs the same program and puts its report in front of Claude when you invoke it. That report holds file paths, line numbers, key names and messages; a message can quote the value it is about (a number in `env`, a value outside the allowed list, a permission rule), and the report never contains a file.
+It reads the settings files and the `.jsonc` files next to them, on your machine. To find the local settings file on Linux and macOS it looks for `.git` in the folders above the project, and reads a worktree's `.git` file. To find backups and managed drop-in files it lists folders. It reads its own record of the last build. It writes only what is described above, on the commands that write, and saves a settings file next to itself before it replaces it. It never uses the network, starts no process, has no telemetry, no account and no cache outside `<config folder>/settings-doctor/`, and sends nothing anywhere. A test fails if any file under `src/` or `bin/` imports anything but `node:crypto`, `node:fs`, `node:os` or `node:path`, opens a socket or starts a process. The plugin's skill runs the same program and puts its report in front of Claude when you invoke it. That report holds file paths, line numbers, key names and messages. A message can quote the value it is about (a number in `env`, a value outside the allowed list, a permission rule). The report never contains a whole file.
 
 ## What was verified, and how
 
-Checked on 2026-10-16 on Windows 11 with Node 24.19.0, git 2.55.0 and Claude Code 2.1.295 and 2.1.299 (every real-binary check passed on both). CI runs the unit tests on Linux, macOS and Windows with Node 20, 22 and 24 and on Linux with Node 18, and the real-binary checks on Linux and macOS against the npm release of Claude Code (2.1.301 on the first green run). All 12 jobs (10 of the unit tests, 2 of the real-binary checks) passed on the first green run, on 2026-10-16; the badges at the top show the latest runs.
+Checked on 2026-10-16 on Windows 11 with Node 24.19.0, git 2.55.0 and Claude Code 2.1.295 and 2.1.299 (every real-binary check passed on both). CI runs the unit tests on Linux, macOS and Windows with Node 20, 22 and 24 and on Linux with Node 18. It runs the real-binary checks on Linux and macOS against the npm release of Claude Code (2.1.301). All 12 jobs (10 of the unit tests, 2 of the real-binary checks) passed on the first green run, on 2026-10-16, and again on the release commit. The badges at the top show the latest runs.
 
-- **344 automated tests** (`npm test`, Node's own runner, no dependencies, about 5 seconds; `node --test` also reports each of the five helper files under `test/` as a passing test, on every Node version CI runs, 18 to 24, which is not counted here). Without a Claude Code binary 320 pass on Windows and 321 on Linux and macOS (the test of file modes is skipped on Windows); 23 are the real-binary checks below and run only when `E2E_CLAUDE` names one. They cover: the JSONC reader (500 random documents in four layouts read the way `JSON.parse` reads them, 5,000 damaged ones accepted or refused as `JSON.parse` does); the editing of text (1,500 random documents for insert and for remove and 1,000 for replace, with every comment outside the changed element still there, and CRLF, tabs and spaces kept); `build` (1,000 random documents, and the output built again is the same); `absorb` (random settings.json changes into random commented files, with and without removals, with no record of the last build, and to lists of hook groups: the same settings, every comment kept when nothing is taken out); the comparison of two settings; the writing code (backups, atomic writes, symlinks, the fallback when the rename fails, restore, the record of the last build); `init`, `build`, `check`, `absorb` and `restore` through the command line in throwaway worlds, with the refusals and the files left untouched; `watch`; the loader and the merge (precedence, drop-in folders, git roots and worktrees, files of the wrong shape); the schema checker; the lint table; `explain`; the reports and their size caps; the command line (every usage error and exit code); the package files, the workflows and the README.
-- **23 checks against the real binary** (`test/e2e-claude.test.mjs`, run when `E2E_CLAUDE` names a Claude Code binary; each starts a fake Messages API on 127.0.0.1, so no model is reached and no token is spent, with its own throwaway `HOME`, `USERPROFILE` and `CLAUDE_CONFIG_DIR` and a project folder that Claude Code already trusts). All 23 passed on 2.1.295 and on 2.1.299 on Windows; in CI on Linux and macOS with 2.1.301, 21 ran (two are for the Windows PowerShell tool) and passed. The findings below were the same everywhere unless a bullet says otherwise:
-  - **A comment or a trailing comma.** 27 settings files (9 kinds, each in the user, the project and the local file): a `//` comment, a `/* */` comment, a comment on the first line, a trailing comma in an object and in an array. In each of the 18 with one, Claude Code ignored the whole file: a `model` in it did not arrive in the request and a `SessionStart` hook in it did not run. In each of the 9 without (strict JSON, with CRLF line endings, with a byte-order mark) both did. `lint` said the same for all 27. A `claude -p` run printed nothing about the ignored file. A `settings.jsonc` that `build` wrote into a `settings.json` was read, and a `settings.jsonc` alone changed nothing.
-  - **Which file wins.** `model` and `env` in the user, project and local files, in five combinations (user alone, project over user, local over project, local over user, all three): the higher file won the model and each key of `env`, the keys of every file arrived (objects merge key by key), and the `SessionStart` hooks of every file ran (lists are joined). `show --json` named the same model, the same `env` and the same hooks in all five.
-  - **The lint table.** `test/lint-table.mjs` holds 96 settings with one thing wrong in each. `claude doctor` listed, for every one of the 96, the paths the table says (and none for the ones that are only unknown keys or deprecated). For the 80 that are an object without a `model`, a `model` was added to the file: it arrived in the request exactly when the lint says the file is not ignored. This is what the lint says about wrong types: Claude Code ignores the whole file for a value of the wrong type in most keys, and only that field in `hooks`, `allowedMcpServers`, `deniedMcpServers`, `extraKnownMarketplaces` and `managedMcpServers` (each of the five was in the table); for a marketplace of `extraKnownMarketplaces` that is wrong it drops only that entry.
-  - **Hooks.** 14 hook lists with something wrong (a bad entry beside a good one, a matcher that is a number, a group that is a string or has no hooks, an event that does not exist or is an object, a field the schema lacks, a type in the wrong case, an `async` that is a string, an event in lower case, a bad entry in `Stop`, `PreToolUse` and `PermissionRequest`): the hooks that ran were the ones the lint says remain. A bad entry costs only the entry (the other entries of its group and the other groups ran); in `PreToolUse` and `PermissionRequest` it costs the whole file. A matcher that is not a regular expression never matched, and the lint says so.
+- **349 automated tests** (`npm test`, Node's own runner, no dependencies, about 5 seconds). `node --test` also reports each of the five helper files under `test/` as a passing test, on every Node version CI runs (18 to 24); those are not counted here. Without a Claude Code binary 322 pass on Windows and 323 on Linux and macOS (the test of file modes is skipped on Windows). 26 are the real-binary checks below and run only when `E2E_CLAUDE` names one. The tests cover:
+  - the JSONC reader: 500 random documents in four layouts read the way `JSON.parse` reads them, and 5,000 damaged ones accepted or refused as `JSON.parse` does;
+  - the editing of text: 1,500 random documents for insert and for remove and 1,000 for replace, with every comment outside the changed element still there, and CRLF, tabs and spaces kept;
+  - `build`: 1,000 random documents, and the output built again is the same;
+  - `absorb`: random changes of `settings.json` taken into random commented files, with and without removals, with no record of the last build, and into lists of hook groups. The same settings come out, and every comment stays when nothing is taken out;
+  - the comparison of two settings, and the writing code (backups, atomic writes, symlinks, the fallback when the rename fails, restore, the record of the last build);
+  - `init`, `build`, `check`, `absorb` and `restore` through the command line in throwaway worlds, with the refusals and the files left untouched, and `watch`;
+  - the loader and the merge (precedence, drop-in folders, git roots and worktrees, files of the wrong shape), the schema checker, the lint table, `explain`, the reports and their size caps, and the command line (every usage error and exit code);
+  - the package files, the workflows and the README: its sections, commands, flags and usage block, and the numbers it quotes from the code.
+- **26 checks against the real binary** (`test/e2e-claude.test.mjs`, run when `E2E_CLAUDE` names a Claude Code binary). Each starts a fake Messages API on 127.0.0.1, so no model is reached and no token is spent. Each has its own throwaway `HOME`, `USERPROFILE` and `CLAUDE_CONFIG_DIR` and a project folder that Claude Code already trusts. All 26 passed on 2.1.295 and on 2.1.299 on Windows. In CI on Linux and macOS with 2.1.301, 24 ran (two are for the Windows PowerShell tool) and passed. The findings below were the same everywhere unless a bullet says otherwise:
+  - **A comment or a trailing comma.** 27 settings files: 9 kinds, each in the user, the project and the local file. Six kinds had a mistake: a `//` comment on its own line, a `//` comment after a value, a `/* */` comment, a comment on the first line, a trailing comma in an object, and one in an array. Three did not: strict JSON, CRLF line endings and a byte-order mark. In each of the 18 with a mistake, Claude Code ignored the whole file: a `model` in it did not arrive in the request and a `SessionStart` hook in it did not run. In each of the 9 without, both did. `lint` said the same for all 27. A `claude -p` run printed nothing about the ignored file: what it printed has none of the words settings, invalid, malformed, ignored, parse or json. A `settings.jsonc` that `build` wrote into a `settings.json` was read. A `settings.jsonc` alone, in the user, the project or the local place, changed nothing.
+  - **Which file wins.** `model` and `env` in the user, project and local files, in five combinations (user alone, project over user, local over project, local over user, all three). The higher file won the model and each key of `env`, the keys of every file arrived (objects merge key by key), and the `SessionStart` hooks of every file ran (lists are joined). `show --json` named the same model, the same `env` and the same hooks in all five.
+  - **A hook that several files hold.** The same hook in the user, project and local files ran once, not three times, and `show` lists it once with the three files. Other lists, such as a permission rule in two files, were not put to the binary.
+  - **The lint table.** `test/lint-table.mjs` holds 97 settings: 86 with something wrong in them and 11 that the binary takes as they are. `claude doctor` listed, for every one of the 97, the paths the table says (and none for the ones that are only unknown keys or deprecated), and it printed every one of the 63 phrases that the lint quotes from it. For the 81 that are an object without a `model`, a `model` was added to the file. It arrived in the request exactly when the lint says the file is not ignored. This is what the lint says about wrong types: Claude Code ignores the whole file for a value of the wrong type in most keys, and only that field in `hooks`, `allowedMcpServers`, `deniedMcpServers` and `extraKnownMarketplaces` (each was in the table). For a marketplace of `extraKnownMarketplaces` that is wrong it drops only that entry. `managedMcpServers` is ignored in a user, project or local file whatever its value (a string and a list of objects were in the table).
+  - **Hooks.** 14 hook lists with something wrong, each put to the binary:
+    - a bad entry beside a good one, with another group beside it;
+    - a matcher that is a number, a group that is a string, a group with no hooks;
+    - an event that does not exist, an event that is an object, an event in lower case;
+    - a field the schema lacks (in an entry and in a group), a type in the wrong case, an `async` that is a string;
+    - a bad entry in `Stop`, a bad entry in `PreToolUse`, a bad matcher in `PermissionRequest`.
+
+    The hooks that ran were the ones the lint says remain. A bad entry costs only the entry: the other entries of its group and the other groups ran. In `PreToolUse` it costs the whole file, and so does a bad matcher in `PermissionRequest`. A matcher that is not a regular expression never matched, and the lint says so.
   - **Values.** `env` values that are not strings arrived as `String(value)`: `1`, `1.5`, `false`, `null`, `1,2` for a list, `[object Object]` for an object. A key written twice in an object: the last one was kept.
-  - **The project and the local file in a git repository.** Started in `repo/sub` of a git repository, with a project file and a local file in both `repo/.claude` and `repo/sub/.claude`: on Windows (2.1.295 and 2.1.299) Claude Code read the two of `sub/.claude` and neither of the two at the repository root (the hooks of `sub-project` and `sub-local` ran); on Linux and macOS (2.1.301, in CI) it read the project file of `sub/.claude` and the local files of both folders (`sub-project`, `sub-local` and `root-local` ran, `root-project` did not). `show` named the same files in all of them.
-  - **The plugin.** `claude plugin validate` and `--strict` pass. With the plugin loaded, a plain prompt's request was the same size and had the same tool list with and without it, and the word `settings-doctor` did not occur in it (68,582 characters on 2.1.295, 69,112 on 2.1.299, 64,376 on 2.1.301 on Linux, 65,355 on macOS). `/settings-doctor:check` reached the model with the lint report for the project in it and the instruction after it, also when the lint found problems; the figures in "What it costs in tokens" are from that capture. The model could run the command from the skill's `allowed-tools` with no prompt in the default permission mode, with the Bash tool and, on Windows, the PowerShell tool. Claude Code runs the command line of a skill and pastes its output when the shell tool is allowed for it (what `allowed-tools` does here), and otherwise hands the model `[run this first, exactly as written, ...]` with the command filled in: I saw both, and the skill's text reads right in both. `claude plugin details` for the installed plugin: `Always-on: ~11 tok`, `check < 20` always-on and about 90 when used.
+  - **The project and the local file in a git repository.** Started in `repo/sub` of a git repository, with a project file and a local file in both `repo/.claude` and `repo/sub/.claude`. On Windows (2.1.295 and 2.1.299) Claude Code read the two of `sub/.claude` and neither of the two at the repository root: the hooks of `sub-project` and `sub-local` ran. On Linux and macOS (2.1.301, in CI) it read the project file of `sub/.claude` and the local files of both folders: `sub-project`, `sub-local` and `root-local` ran, `root-project` did not. `show` named the same files in all of them.
+  - **A skill whose command fails.** A copy of the skill with the command `lint`, without `--markdown`, on a project with a finding (the command exits 1) sent no request to the model on Claude Code 2.1.295 and 2.1.299 on Windows. The same copy with `--markdown` did.
+  - **`claude --help`** lists 18 commands on 2.1.295 and on 2.1.299, and none of them is about config or settings. `claude doctor` is the one that reads settings files, and it lists only the ones it could not use.
+  - **The plugin.** `claude plugin validate` and `--strict` pass. With the plugin loaded, a plain prompt's request was the same size with and without it, and it had the same tool list. The word `settings-doctor` did not occur in it. The sizes were 68,582 characters on 2.1.295, 69,112 on 2.1.299, 64,376 on 2.1.301 on Linux and 65,355 on macOS. `/settings-doctor:check` reached the model with the lint report for the project in it and the instruction after it, also when the lint found problems. The figures in "What it costs in tokens" are from that capture. The model could run the command from the skill's `allowed-tools` with no prompt in the default permission mode, with the Bash tool and, on Windows, the PowerShell tool. Claude Code runs the command line of a skill and pastes its output when the shell tool is allowed for it (what `allowed-tools` does here). Otherwise it hands the model `[run this first, exactly as written, ...]` with the command filled in. I saw both, and the skill's text reads right in both. `claude plugin details` for the installed plugin: `Always-on: ~11 tok`, `check < 20` always-on and about 90 when used.
 - **From GitHub.** `npx -y github:nrzz/claude-settings-doctor lint --project .` ran from the published repository with a throwaway npm cache and home folder (8 seconds on Windows), and printed the `lint` report of a folder with the user and project files of the example above (exit 1: it had findings).
 
 ## Not verified
 
-- **Managed settings.** Their place on each system and their precedence over the other files come from the documentation. They are read (and tested) from `managed-settings.json` and its drop-in folder, but the binary was not put to them: that needs a system folder these checks do not write to. Server-managed settings, macOS profiles and the Windows registry are not read.
+- **Managed settings.** Their place on each system and their precedence over the other files come from the documentation. They are read (and tested) from `managed-settings.json` and its drop-in folder, but the binary was not put to them: that needs a system folder these checks do not write to. Server-managed settings, macOS profiles and the Windows registry are not read. Whether a wrong type in a managed file drops the field or the file was not tried either.
+- **Merge rules beyond hooks.** That an item two files both hold counts once is seen for hooks only. That a value of another type replaces the lower file's is the documentation's account. The binary was not asked about either for other keys.
+- **Exceptions to the repository-root rule.** A repository root that is your home folder, or that belongs to another user, is taken from claude-permission-doctor's loader. The binary was not put to either.
 - **Flags and plugins.** `--settings`, `--setting-sources`, `--add-dir` and the settings a plugin supplies are not read, and `show` says so.
-- **The interactive interface.** I did not drive it. What it shows at start-up about a settings file Claude Code ignores is not known (a `-p` run printed nothing; `claude doctor` lists it). The "Always allow" and `/config` writes in the examples and tests are made by a script that writes `settings.json` the way Claude Code does.
+- **The interactive interface.** I did not drive it. What it shows at start-up about a settings file Claude Code ignores is not known (a `-p` run printed nothing; `claude doctor` lists it), and neither is how much of the merge `/status` and `/config` show. The "Always allow" and `/config` writes in the examples and tests are made by a script that writes `settings.json` the way Claude Code does.
 - **A session that is already running.** Whether it picks up a `settings.json` that `build` wrote while it runs, or only reads it at start, was not checked: every real-binary check starts a new `claude -p` after the files are written.
 - **Other versions.** The local runs are Claude Code 2.1.295 and 2.1.299, the CI run 2.1.301. CI runs the checks with the newest npm release every week, so a later release that reads settings differently shows up there as a red job. The lint table is what those versions did.
 - **Linux and macOS** are covered by CI only; nothing was run on either by hand.
-- **The schema** is SchemaStore's of the download date. A key Claude Code accepts that the schema lacks is flagged as unknown (the lint says the schema may lag), and a value the schema allows that Claude Code rejects is a finding only where the 96 settings show it (`permissions.defaultMode: "delegate"`).
+- **The schema** is SchemaStore's of the download date. A key Claude Code accepts that the schema lacks is flagged as unknown (the lint says the schema may lag). A value the schema allows that Claude Code rejects is a finding only where the 97 settings show it (`permissions.defaultMode: "delegate"`).
 - **Hook types other than `command`.** `http`, `prompt`, `agent` and `mcp_tool` entries are checked against the schema's shapes. Only command hooks were run; two rows of the lint table (a `prompt` hook without a prompt, an `http` hook without a url) were put to `claude doctor`.
 - **`watch` on a network drive or under WSL** with folder events or with `--poll`: the events and the polling were tested on local folders only.
 - **The skill with a model.** It was run through the real binary at zero tokens, as above; what Claude then says about the report was not checked.
@@ -537,12 +589,14 @@ Checked on 2026-10-16 on Windows 11 with Node 24.19.0, git 2.55.0 and Claude Cod
 | `src/schema.mjs`, `src/schema/` | The checker for SchemaStore's schema; the vendored schema, its licence and the record of the download |
 | `src/lint.mjs`, `src/facts.mjs` | The checks; what the real binary was seen to do, as tables |
 | `src/init.mjs`, `src/absorb.mjs`, `src/diff.mjs` | Annotating from the schema; taking Claude Code's edits into settings.jsonc; comparing two settings |
-| `src/write.mjs`, `src/actions.mjs`, `src/watch.mjs` | The only code that writes: backups, atomic writes, restore, the record of the last build; init, build, check, absorb and restore; watch |
+| `src/write.mjs` | The only code that writes: backups, atomic writes, restore, the record of the last build |
+| `src/actions.mjs`, `src/watch.mjs` | init, build, check, absorb and restore on top of it; watch |
+| `src/version.mjs` | The version number, which `package.json` and `plugin.json` must agree with |
 | `src/report.mjs` | The text, markdown and JSON reports |
 | `scripts/update-schema.mjs` | Downloads the schema by hand; not part of the package |
 | `skills/check/` | `/settings-doctor:check`, the user-only skill |
 | `.claude-plugin/` | The plugin manifest and its icon |
-| `test/` | `npm test`; `lint-table.mjs` is the 96 settings with one thing wrong, `e2e-claude.test.mjs` puts them and the rest to the binary |
+| `test/` | `npm test`; `lint-table.mjs` is the settings the lint is held to (what it says, and what `claude doctor` lists), `e2e-claude.test.mjs` puts them and the rest to the binary |
 
 Related: [claude-permission-doctor](https://github.com/nrzz/claude-permission-doctor) explains why a permission prompt appeared and finds dead rules, and [claude-hook-bench](https://github.com/nrzz/claude-hook-bench) runs every hook with the JSON Claude Code sends.
 

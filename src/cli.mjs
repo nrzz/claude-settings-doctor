@@ -32,7 +32,8 @@ Read (they change nothing):
 
 The commented source (each takes --user, --project <dir> or --local to name the settings file):
   init     [--force] [--dry-run]
-           write settings.jsonc next to settings.json, every key annotated from the schema
+           write settings.jsonc next to settings.json, with a comment above each key the schema
+           describes
   build    [--force] [--dry-run]
            write settings.json from settings.jsonc: comments and trailing commas gone, keys in
            order, two-space indentation; the old file is saved first; refuses when settings.json
@@ -46,14 +47,15 @@ The commented source (each takes --user, --project <dir> or --local to name the 
            change) into settings.jsonc, comments kept; the old settings.jsonc is saved first
   watch    [--poll <ms>] [--dry-run]
            build now, and again on every save of settings.jsonc; --poll looks at the file every
-           <ms> milliseconds, for a place where folder events do not arrive
+           <ms> milliseconds (50 or more), for a place where folder events do not arrive
   restore  [--jsonc] [--list] [--dry-run]
            put the newest backup back (of settings.jsonc with --jsonc); --list names the backups
 
 Files: --user is <config folder>/settings.json (CLAUDE_CONFIG_DIR, else ~/.claude);
 --project <dir> is <dir>/.claude/settings.json; --local is <dir>/.claude/settings.local.json
-(in the folder --project names, else the folder you are in). The commented source sits next
-to each, with the extension .jsonc. Claude Code reads settings.json only.
+(<dir> is the folder --project names, else the folder you are in; on Linux and macOS in a git
+repository --local is at the root of the repository). The commented source sits next to
+each, with the extension .jsonc. Claude Code reads settings.json only.
 
 Options for every command:
   --json         one JSON document on stdout
@@ -65,8 +67,8 @@ Exit codes: 0 ok; 1 findings, a difference or a refusal; 2 a usage error or an u
 Environment: CLAUDE_CONFIG_DIR (Claude's config folder), NO_COLOR, and
 CLAUDE_SETTINGS_DOCTOR_MANAGED_DIR (the folder to read managed-settings.json from, instead of the
 system folder; the tests use it).
-It reads settings files, writes only with init, build, absorb, watch and restore (a file they
-replace is saved next to itself first), and never uses the network.
+It reads settings files, writes only with init, build, absorb, watch and restore (a settings
+file they replace is saved next to itself first), and never uses the network.
 `;
 
 class UsageError extends Error {}

@@ -1,5 +1,6 @@
-// A table of settings with one thing wrong in each, what the lint says, and what `claude doctor` (Claude Code
-// 2.1.295) listed under "Invalid settings" for the same file. test/lint.test.mjs checks the lint column;
+// A table of settings, most with one thing wrong in them and a few that the binary takes as they are (their
+// `expect` is empty), what the lint says, and what `claude doctor` (Claude Code 2.1.295) listed under "Invalid
+// settings" for the same file. test/lint.test.mjs checks the lint column;
 // test/e2e-claude.test.mjs puts every row to the real binary (`claude doctor`, and whether the file applies at all)
 // and checks that the doctor column and the lint agree with what it does.
 //
@@ -69,7 +70,8 @@ export const ROWS = [
   { name: "allowedMcpServers is a string", file: { allowedMcpServers: "x" }, expect: ["error wrong-type field allowedMcpServers"], doctor: ["allowedMcpServers"] },
   { name: "deniedMcpServers is a string", file: { deniedMcpServers: "x" }, expect: ["error wrong-type field deniedMcpServers"], doctor: ["deniedMcpServers"] },
   { name: "extraKnownMarketplaces is a string", file: { extraKnownMarketplaces: "x" }, expect: ["error wrong-type field extraKnownMarketplaces"], doctor: ["extraKnownMarketplaces"] },
-  { name: "managedMcpServers is a string", file: { managedMcpServers: "x" }, expect: ["error wrong-type field managedMcpServers"], doctor: ["managedMcpServers"] },
+  { name: "managedMcpServers as a string: only managed settings honor it, whatever its type", file: { managedMcpServers: "x" }, expect: ["error managed-only field managedMcpServers"], doctor: ["managedMcpServers"] },
+  { name: "managedMcpServers as a list of objects: ignored outside managed settings all the same", file: { managedMcpServers: [{ serverName: "a" }] }, expect: ["error managed-only field managedMcpServers"], doctor: ["managedMcpServers"] },
   { name: "a marketplace of extraKnownMarketplaces is a string: only that entry goes", file: { extraKnownMarketplaces: { a: "x" } }, expect: ["error wrong-type entry extraKnownMarketplaces.a"], doctor: ["extraKnownMarketplaces.a"] },
   { name: "enabledPlugins is an array", file: { enabledPlugins: ["a@b"] }, expect: ["error wrong-type file enabledPlugins"], doctor: ["enabledPlugins"] },
   { name: "an enabledPlugins value is a string", file: { enabledPlugins: { "a@b": "yes" } }, expect: ["error wrong-type file enabledPlugins.a@b"], doctor: ["enabledPlugins.a@b"] },

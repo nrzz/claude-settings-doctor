@@ -1,6 +1,7 @@
-// The only code that writes. A settings file is the user's: every write backs the file up first (next to it,
-// named <file>.bak-settings-doctor-<timestamp>), goes through a temporary file and a rename so that nobody sees
-// half of it, keeps the file's mode, and follows a symlink to the file instead of replacing the link.
+// The only code that writes. A settings file is the user's: a write that replaces one backs it up first (next to
+// it, named <file>.bak-settings-doctor-<timestamp>; a file that is not there yet has nothing to back up), goes
+// through a temporary file and a rename so that nobody sees half of it, keeps the file's mode, and follows a
+// symlink to the file instead of replacing the link.
 // `restore` puts a backup back. Besides the settings files, one small record per settings file is kept in
 // <config folder>/settings-doctor/: the text of settings.json as of the last build, absorb or init, which is
 // how absorb tells what Claude Code changed from what you did.

@@ -19,7 +19,7 @@
 //   not-checked        something the checker cannot judge, said once per file
 import fs from "node:fs";
 import { buildFromJsonc } from "./build.mjs";
-import { BOUNDS_ENFORCED, ENUM_EXTRA, ENUM_REJECTED, FIELD_LEVEL, HOOK_EVENTS, HOOK_TYPES, NULL_OK, TYPE_EXTRA, WHOLE_FILE_EVENTS, isUnchecked } from "./facts.mjs";
+import { BOUNDS_ENFORCED, ENUM_EXTRA, ENUM_REJECTED, FIELD_LEVEL, HOOK_EVENTS, HOOK_TYPES, MANAGED_ONLY, NULL_OK, TYPE_EXTRA, WHOLE_FILE_EVENTS, isUnchecked } from "./facts.mjs";
 import { findMember, positionAt, setOwn, toValue } from "./jsonc.mjs";
 import { article, deprecation, firstSentence, jsonType, loadSchema, nearest, vendored } from "./schema.mjs";
 
@@ -124,7 +124,7 @@ export function lintFile(file, { schema = vendored(), meta = loadSchema().meta, 
       } else if (p.kind === "trailing-comma") {
         add("invalid-json", "error", "file", [], `The file has ${p.message}${lines}. Claude Code ignores the whole file: none of its settings apply (claude doctor says "Invalid or malformed JSON").`, { offset: p.offset, fix: "Delete the comma before the closing bracket." });
       } else {
-        add("not-an-object", "error", "file", [], `${p.message[0].toUpperCase()}${p.message.slice(1)}. Claude Code ignores the file (claude doctor says "Expected object").`, { offset: p.offset });
+        add("not-an-object", "error", "file", [], `${p.message[0].toUpperCase()}${p.message.slice(1)}. Claude Code ignores the file (claude doctor says "${/holds null/.test(p.message) ? "Invalid or malformed JSON" : "Expected object"}").`, { offset: p.offset });
       }
     }
     if (analysis.ignored) {
@@ -162,9 +162,20 @@ export function lintFile(file, { schema = vendored(), meta = loadSchema().meta, 
     if (typeof v === "string" && values.includes(v)) issues.push({ path: keyPath, kind: "enum", message: `${JSON.stringify(v)} is allowed by the schema but not by Claude Code 2.1.295` });
   }
   const removed = effective.removed;
+  // a key that only managed settings honor is ignored anywhere else, whatever its value (a file of unknown scope is not judged)
+  const managedOnly = new Set();
+  if (file.scope !== "managed" && file.scope !== "file") {
+    for (const key of MANAGED_ONLY) {
+      if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
+      managedOnly.add(key);
+      add("managed-only", "error", "field", [key], `${quote(key)} is only honored from managed settings, so Claude Code ignores it in this file, whatever its value, and applies the rest of the file (claude doctor: "is only honored from managed settings and was ignored here").`, { at: "key" });
+      removed.push({ path: [key], effect: "field", why: "only honored from managed settings" });
+    }
+  }
   for (const issue of issues) {
     const keyPath = issue.path;
     if (keyPath[0] === "hooks") continue; // judged below, in the words Claude Code uses
+    if (managedOnly.has(keyPath[0])) continue; // said once, above
     const name = quote(keyPath.filter((p) => typeof p === "string").slice(-1)[0] ?? "");
     const here = formatPath(keyPath);
     const top = keyPath[0];

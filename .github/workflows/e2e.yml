@@ -1,7 +1,7 @@
 name: e2e
 
 # The checks that run the real Claude Code: what it does with a settings file that has a comment or a trailing
-# comma, how the user, project and local files combine, what `claude doctor` lists for each of the 96 settings in
+# comma, how the user, project and local files combine, what `claude doctor` lists for each of the settings in
 # test/lint-table.mjs, which hooks run when a hook list is wrong, and that the plugin validates and its skill hands
 # the model the lint report. They cost nothing: Claude Code talks to a fake server on 127.0.0.1. Optional by design:
 # if the binary cannot be installed, the checks skip. Weekly, so a Claude Code release that changes how it reads

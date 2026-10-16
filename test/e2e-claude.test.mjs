@@ -4,7 +4,7 @@
 //      built into settings.json is read;
 //   b. the order of the files (user, project, local) and how they combine: a value is replaced, objects merge key
 //      by key, the hooks of every file run, and `show` says what the binary did;
-//   c. the lint table (test/lint-table.mjs): `claude doctor` lists what the table says for each of the 96 settings,
+//   c. the lint table (test/lint-table.mjs): `claude doctor` lists what the table says for each of its settings,
 //      and the whole file is ignored exactly when the lint says it is; which hooks run when an entry, a group or an
 //      event is wrong is what the lint says remains; env values become the strings the lint says;
 //   d. the plugin: it validates, /settings-doctor:check hands the model the lint report, its skill adds nothing to
@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { ROOT, run } from "./helpers.mjs";
-import { CLAUDE, claudeInfo, fakeApi, put, readLog, recorder, runClaude, sandbox, sessionStartHook, skip, textBlocks, userText } from "./claude-sandbox.mjs";
+import { CLAUDE, claudeInfo, claudeSync, fakeApi, put, readLog, recorder, runClaude, sandbox, sessionStartHook, skip, textBlocks, userText } from "./claude-sandbox.mjs";
 import { ROWS } from "./lint-table.mjs";
 import { loadSettings } from "../src/settings.mjs";
 import { lintSettings } from "../src/lint.mjs";
@@ -103,7 +103,7 @@ test("a comment or a trailing comma makes Claude Code ignore the whole settings.
   for (const r of results) {
     const applied = r.model === "m-probe";
     assert.equal(applied, !r.ignored, `${r.scope}: ${r.what}: the model was ${r.model}`);
-    assert.doesNotMatch(r.said, /invalid|malformed/i, `${r.scope}: ${r.what}: a -p run says nothing about the file it ignored`);
+    assert.doesNotMatch(r.said, /settings|invalid|malformed|ignored|parse|json/i, `${r.scope}: ${r.what}: a -p run says nothing about the file it ignored`);
     assert.deepEqual(r.ran, r.ignored ? [] : ["ran"], `${r.scope}: ${r.what}: the hook ${r.ignored ? "ran" : "did not run"}`);
     // the lint agrees with the binary
     assert.equal(r.lint.effective.ignored !== null, r.ignored, `${r.scope}: ${r.what}: the lint says ${JSON.stringify(r.lint.effective.ignored)}`);
@@ -132,14 +132,17 @@ test("a settings.jsonc with comments, built into settings.json, is read by Claud
     assert.deepEqual(log.map((l) => l.label), ["ran"]);
     assert.equal(log[0].env.CSD_FROM, "jsonc", "the env key reached the hook");
   } finally { await api.close(); }
-  // the commented file next to it is never read by Claude Code: a model only in settings.jsonc would not apply
-  const sb2 = sandbox("jsonc-only");
-  fs.writeFileSync(`${sb2.user}c`, '{ "model": "m-probe" }');
-  const api2 = await fakeApi();
-  try {
-    await runClaude(sb2, api2, ["-p", "PROBE-MAIN hi", "--output-format", "json"]);
-    assert.notEqual(main(api2).model, "m-probe", "settings.jsonc alone does nothing");
-  } finally { await api2.close(); }
+  // the commented file next to it is not read by Claude Code: a model only in a settings.jsonc does not apply, in any of the three places
+  for (const place of ["user", "project", "local"]) {
+    const sb2 = sandbox(`jsonc-only-${place}`);
+    fs.mkdirSync(path.dirname(sb2[place]), { recursive: true });
+    fs.writeFileSync(`${sb2[place]}c`, '{ "model": "m-probe" }');
+    const api2 = await fakeApi();
+    try {
+      await runClaude(sb2, api2, ["-p", "PROBE-MAIN hi", "--output-format", "json"]);
+      assert.notEqual(main(api2).model, "m-probe", `a settings.jsonc alone does nothing (${place})`);
+    } finally { await api2.close(); }
+  }
 });
 
 test("absorb: an edit made to settings.json while Claude Code runs (the file as Claude Code writes it) goes back into settings.jsonc and the binary still reads the result", { skip: skip(), timeout: 120000 }, async () => {
@@ -198,6 +201,15 @@ test("lists are joined across files: the hooks of an event in two files all run"
   assert.deepEqual(p.ran, ["p1", "p2", "u1", "u2"]);
   const shown = (await toolRun(p.sb, ["show", "--json"])).json();
   assert.equal(shown.entries.find((e) => e.path === "hooks.SessionStart").items.length, 3, "three groups, from two files");
+});
+
+test("a hook that two files both hold runs once, and `show` lists it once with both files", { skip: skip(), timeout: 180000 }, async () => {
+  const same = { SessionStart: [{ hooks: [recorder("same")] }] };
+  const p = await probe("join-same", { user: { hooks: same }, project: { hooks: same }, local: { hooks: same } });
+  assert.deepEqual(p.ran, ["same"], "the hook ran once, not once for each file");
+  const entry = (await toolRun(p.sb, ["show", "--json"])).json().entries.find((e) => e.path === "hooks.SessionStart");
+  assert.equal(entry.items.length, 1);
+  assert.equal(1 + (entry.items[0].also || []).length, 3, "and it names the three files");
 });
 
 test("in a git repository the binary reads the project file of the folder it starts in; `show` agrees about the project file and the local file", { skip: skip(), timeout: 180000 }, async (t) => {
@@ -293,17 +305,22 @@ test("the lint table put to the binary: for each of the settings, `claude doctor
       } finally { await api.close(); }
     }
     const lint = lintOf(sb).files.find((f) => f.scope === "user");
-    return { row, got, applied, lintIgnored: lint.effective.ignored !== null };
+    // the words that the lint's messages quote from `claude doctor`, and whether `claude doctor` printed them for this file
+    const quoted = [...new Set(lint.findings.flatMap((x) => [...x.message.matchAll(/claude doctor(?: says| lists it under|:)? "([^"]+)"/g)].map((m) => m[1])))];
+    return { row, got, applied, lintIgnored: lint.effective.ignored !== null, quoted, notSaid: quoted.filter((q) => !doctor.out.includes(q)) };
   });
   let effectChecked = 0;
+  let quotedChecked = 0;
   for (const r of results) {
     assert.deepEqual(r.got, [...r.row.doctor].sort(), `${r.row.name}: what claude doctor lists`);
+    quotedChecked += r.quoted.length;
+    assert.deepEqual(r.notSaid, [], `${r.row.name}: words the lint quotes from claude doctor that claude doctor did not print`);
     if (r.applied !== null) {
       effectChecked++;
       assert.equal(r.applied, !r.lintIgnored, `${r.row.name}: the binary ${r.applied ? "applied" : "ignored"} the file; the lint says it is ${r.lintIgnored ? "ignored" : "applied"}`);
     }
   }
-  t.diagnostic(`${results.length} settings put to the binary: claude doctor agreed with the table on all ${results.length}; for ${effectChecked} of them (an object without a model) the file was applied or ignored as the lint says`);
+  t.diagnostic(`${results.length} settings put to the binary: claude doctor agreed with the table on all ${results.length}, and printed every one of the ${quotedChecked} phrases the lint quotes from it; for ${effectChecked} of them (an object without a model) the file was applied or ignored as the lint says`);
   assert.ok(effectChecked >= 60);
 });
 
@@ -361,6 +378,43 @@ test("an empty file and a file of spaces: nothing is read, claude doctor says no
 // ---- (d) the skill ------------------------------------------------------------------------------------------------------
 
 const SKILL_FILES = { user: { model: "m-probe", includeCoAuthoredBy: true }, project: '{\n  // a note\n  "cleanupPeriodDay": 3\n}\n' };
+
+test("claude --help lists no command that prints the settings", { skip: skip(), timeout: 120000 }, (t) => {
+  const r = claudeSync(sandbox("help"), ["--help"]);
+  const part = /\nCommands:\r?\n([\s\S]*)$/.exec(r.out);
+  assert.ok(part, "the help has a Commands section");
+  const names = [...part[1].matchAll(/^ {2}([a-z][a-z-]*)/gm)].map((m) => m[1]);
+  assert.ok(names.length >= 5, `the commands were read: ${names.join(", ")}`);
+  assert.deepEqual(names.filter((n) => /config|setting/.test(n)), [], "none of them is about config or settings");
+  t.diagnostic(`claude --help lists ${names.length} commands and none shows the merged settings: ${names.join(", ")}`);
+});
+
+test("a skill whose command line exits 1 never reaches the model, and the same skill with --markdown does: why lint --markdown always exits 0", { skip: skip(), timeout: 300000 }, async (t) => {
+  const seen = {};
+  for (const [variant, flag] of [["without --markdown", ""], ["with --markdown", " --markdown"]]) {
+    const sb = sandbox("failskill");
+    put(sb.user, '{\n  // a comment\n  "model": "m-probe"\n}\n');
+    // a copy of the skill whose command is `lint` as it is (exit 1 when it finds something) or `lint --markdown`
+    const plug = path.join(sb.root, "plug");
+    fs.mkdirSync(path.join(plug, ".claude-plugin"), { recursive: true });
+    fs.mkdirSync(path.join(plug, "skills", "check"), { recursive: true });
+    fs.writeFileSync(path.join(plug, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "csd-fail", version: "1.0.0", description: "a copy of the skill that runs lint with or without --markdown" }));
+    const line = `node "${fwd(ROOT)}/bin/claude-settings-doctor.mjs" lint --project "\${CLAUDE_PROJECT_DIR}"${flag}`;
+    fs.writeFileSync(path.join(plug, "skills", "check", "SKILL.md"), [
+      "---", "name: check", "description: Check settings files.", "disable-model-invocation: true",
+      "allowed-tools: Bash(node *) PowerShell(node *)", "---", "", `!\`${line}\``, "", "In at most 10 lines: say what is wrong.", "",
+    ].join("\n"));
+    const api = await fakeApi();
+    try {
+      const r = await runClaude(sb, api, ["-p", "/csd-fail:check", "--plugin-dir", plug, "--output-format", "json", "--permission-mode", "default"]);
+      assert.equal(r.code, 0, r.err);
+      seen[variant] = { requests: api.requests.length, reached: Boolean(withSkill(api)) };
+    } finally { await api.close(); }
+  }
+  t.diagnostic(`a skill whose command exits 1: ${seen["without --markdown"].requests} requests reached the model; with --markdown: ${seen["with --markdown"].requests}`);
+  assert.equal(seen["with --markdown"].reached, true, "the report reaches the model");
+  assert.equal(seen["without --markdown"].reached, false, "a command that exits 1 drops the skill");
+});
 
 test("the user-only skill adds nothing to a request that does not use it: no tool, no skill list entry, no word of it", { skip: skip(), timeout: 180000 }, async (t) => {
   const sb = sandbox("always");

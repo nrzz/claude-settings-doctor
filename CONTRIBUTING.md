@@ -34,11 +34,12 @@ npm test
 | `src/schema.mjs`, `src/schema/` | the checker for SchemaStore's schema, and the vendored copy with its licence and date |
 | `src/lint.mjs`, `src/facts.mjs` | the checks; what the real binary was seen to do, as tables |
 | `src/init.mjs`, `src/absorb.mjs`, `src/diff.mjs` | annotating from the schema; taking Claude Code's edits back into settings.jsonc; comparing two settings |
-| `src/write.mjs`, `src/actions.mjs`, `src/watch.mjs` | the only code that writes (backups, atomic writes, restore, the record of the last build); init, build, check, absorb and restore; watch |
+| `src/write.mjs` | the only code that writes: backups, atomic writes, restore, the record of the last build |
+| `src/actions.mjs`, `src/watch.mjs`, `src/version.mjs` | init, build, check, absorb and restore on top of it; watch; the version number |
 | `scripts/update-schema.mjs` | downloads the schema by hand; the only code that opens a network connection, and not part of the package |
 | `skills/check/`, `.claude-plugin/` | the user-only skill; the plugin manifest and icon |
 | `test/*.test.mjs` | unit tests; `e2e-claude.test.mjs` runs against the real binary when `E2E_CLAUDE` is set |
-| `test/lint-table.mjs` | 96 settings with one thing wrong in each: what the lint says, and what `claude doctor` lists |
+| `test/lint-table.mjs` | the settings the lint is held to (most with one thing wrong, a few that the binary takes as they are): what the lint says, and what `claude doctor` lists |
 
 ## House rules
 
