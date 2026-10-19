@@ -2,6 +2,10 @@
 
 All notable changes to claude-settings-doctor are written here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+- `show --only <key>` prints only the merged entries at or below a key (such as `permissions` or `env`). With `--json`, `entries` and `tree` hold only what is under the key, and the document gets `"only": "<key>"`.
+
 ## [1.0.0] - 2026-10-16
 
 - First release. A CLI and a Claude Code plugin with one user-only skill, `/settings-doctor:check`.

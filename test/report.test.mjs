@@ -92,6 +92,57 @@ test("show --json: the files, the entries with their sources, the merged tree, a
   assert.equal(strip({ a: 1, settings: { big: true } }).settings, undefined);
 });
 
+test("show --only <key>: prints only the entries under a key, with files at top, updated heading and exit 0", async () => {
+  const w = world("show-only", {
+    user: { model: "u", env: { A: "1", B: "2" }, permissions: { allow: ["Bash(a)", "Bash(b)"] } },
+    project: { model: "p", env: { B: "3" }, permissions: { allow: ["Bash(b)", "Bash(c)"], deny: ["Read(.env)"] } },
+  });
+  const r = await run(["show", "--only", "permissions", "--no-color"], w);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /Settings files, highest precedence first/);
+  assert.match(r.out, /Merged settings under permissions \(2 values from 2 files;/);
+  assert.match(r.out, /\n {2}permissions\.allow\s+3 items/);
+  assert.match(r.out, /\n {2}permissions\.deny\s+1 item/);
+  assert.ok(!r.out.includes("model"));
+  assert.ok(!r.out.includes("env.A"));
+  assert.ok(!r.out.includes("env.B"));
+});
+
+test("show --only <key>: a key with nothing under it prints nothing is set under <key> and exits 0", async () => {
+  const w = world("show-only-empty", {
+    user: { model: "u" },
+  });
+  const r = await run(["show", "--only", "permissions"], w);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /Merged settings under permissions \(0 values from 1 file;/);
+  assert.match(r.out, /\n {2}nothing is set under permissions\n/);
+});
+
+test("show --only <key> --json: entries and tree hold only what is under the key, with only recorded", async () => {
+  const w = world("show-only-json", {
+    user: { model: "u", env: { A: "1", B: "2" }, permissions: { allow: ["Bash(a)"] } },
+    project: { env: { B: "3" } },
+  });
+  const j = (await run(["show", "--only", "env", "--json"], w)).json();
+  assert.equal(j.only, "env");
+  assert.deepEqual(j.tree, { A: "1", B: "3" });
+  assert.deepEqual(j.entries.map((e) => e.path), ["env.A", "env.B"]);
+  assert.equal(j.counts.entries, 2);
+  const b = j.entries.find((e) => e.path === "env.B");
+  assert.equal(b.source.scope, "project");
+  assert.equal(b.shadowed[0].source.scope, "user");
+  assert.equal(b.shadowed[0].value, "2");
+  assert.equal(j.counts.shadowed, 1);
+
+  // and with nothing under the key
+  const none = (await run(["show", "--only", "nonexistent", "--json"], w)).json();
+  assert.equal(none.only, "nonexistent");
+  assert.deepEqual(none.entries, []);
+  assert.deepEqual(none.tree, {});
+  assert.equal(none.counts.entries, 0);
+  assert.equal(none.counts.shadowed, 0);
+});
+
 // ---- lint --------------------------------------------------------------------------------------------------------
 
 test("lint: each file with its findings, the line, the key and what to do; a count at the end", async () => {

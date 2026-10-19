@@ -35,6 +35,8 @@ test("parseArgs: an option may be written --name=value, and the options may come
   assert.equal(o.json, true);
   assert.equal(parseArgs(["watch", "--poll=100", "--user"]).poll, 100);
   assert.equal(parseArgs(["lint", "--file=a=b.json"]).file, "a=b.json", "only the first = separates");
+  assert.equal(parseArgs(["show", "--only=permissions"]).only, "permissions");
+  assert.equal(parseArgs(["show", "--only", "permissions.defaultMode"]).only, "permissions.defaultMode");
 });
 
 test("parseArgs: only the first command word is the command; a later one is an argument", () => {
@@ -57,6 +59,10 @@ test("parseArgs: what it refuses", () => {
   bad(["watch", "--poll", "10"], /--poll needs a number of milliseconds, 50 or more/);
   bad(["watch", "--poll", "fast"], /--poll needs a number of milliseconds/);
   bad(["watch", "--poll"], /--poll needs a value/);
+  bad(["show", "--only"], /--only needs a key/);
+  bad(["show", "--only", "--json"], /--only needs a key/);
+  bad(["show", "--only="], /--only needs a key/);
+  bad(["show", "--only", "   "], /--only needs a key/);
   bad(["lint", "--json", "--markdown"], /--json and --markdown cannot be combined/);
 });
 
@@ -97,6 +103,9 @@ test("the options a command does not take are refused by name", async () => {
     [["check", "--user", "--force"], /--force does not belong to check/],
     [["absorb", "--user", "--force"], /--force does not belong to absorb/],
     [["restore", "--user", "--force"], /--force does not belong to restore/],
+    [["lint", "--only", "key"], /--only does not belong to lint/],
+    [["explain", "key", "--only", "key"], /--only does not belong to explain/],
+    [["build", "--user", "--only", "key"], /--only does not belong to build/],
   ];
   for (const [argv, message] of cases) {
     const r = await run(argv, w);
