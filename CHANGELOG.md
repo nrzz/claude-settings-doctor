@@ -4,7 +4,10 @@ All notable changes to claude-settings-doctor are written here. The format follo
 
 ## [Unreleased]
 
-- `show --only <key>` prints only the merged entries at or below a key (such as `permissions` or `env`). With `--json`, `entries` and `tree` hold only what is under the key, and the document gets `"only": "<key>"`.
+## [1.1.0] - 2026-10-19
+
+- `show --only <key>` prints only the merged entries at or below a key (`permissions`, `permissions.defaultMode`, `hooks.PreToolUse`, `env`), each with the file it came from and what a higher file shadows; the list of files at the top stays whole, the heading says the key, and a key with nothing under it prints `nothing is set under <key>` and exits 0. With `--json`, `entries` and `tree` hold only what is under the key and the document gets `"only": "<key>"`. `--only` with no value, or an empty one, is a usage error (exit 2), and the other commands refuse it by name.
+- Contributed by [@Dasprakash-Sekar](https://github.com/Dasprakash-Sekar) in [#2](https://github.com/nrzz/claude-settings-doctor/pull/2), the first outside pull request, for the good first issue [#1](https://github.com/nrzz/claude-settings-doctor/issues/1).
 
 ## [1.0.0] - 2026-10-16
 
@@ -14,4 +17,5 @@ All notable changes to claude-settings-doctor are written here. The format follo
 - What Claude Code does about a mistake is what the real binary did: `test/e2e-claude.test.mjs` puts 97 settings (86 with something wrong in them, 11 that the binary takes as they are) to Claude Code 2.1.295 and 2.1.299, and the same checks run in CI on Linux and macOS with the newest npm release (README "What was verified").
 - Zero tokens for the tool. The skill is user-only, adds nothing to a request that does not use it, and hands the model a report of at most 12 findings.
 
+[1.1.0]: https://github.com/nrzz/claude-settings-doctor/releases/tag/v1.1.0
 [1.0.0]: https://github.com/nrzz/claude-settings-doctor/releases/tag/v1.0.0

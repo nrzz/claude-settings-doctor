@@ -134,7 +134,7 @@ claude-settings-doctor show
 ```
 
 ```text
-claude-settings-doctor 1.0.0  the settings Claude Code merges
+claude-settings-doctor 1.1.0  the settings Claude Code merges
 project   /home/me/shop
 config    /home/me/.claude  (from CLAUDE_CONFIG_DIR)
 schema    SchemaStore's claude-code-settings.json, downloaded 2026-10-16
@@ -184,7 +184,7 @@ claude-settings-doctor lint
 ```
 
 ```text
-claude-settings-doctor 1.0.0  lint
+claude-settings-doctor 1.1.0  lint
 project   /home/me/shop
 config    /home/me/.claude  (from CLAUDE_CONFIG_DIR)
 schema    SchemaStore's claude-code-settings.json, downloaded 2026-10-16
@@ -537,7 +537,7 @@ It reads the settings files and the `.jsonc` files next to them, on your machine
 
 Checked on 2026-10-16 on Windows 11 with Node 24.19.0, git 2.55.0 and Claude Code 2.1.295 and 2.1.299 (every real-binary check passed on both). CI runs the unit tests on Linux, macOS and Windows with Node 20, 22 and 24 and on Linux with Node 18. It runs the real-binary checks on Linux and macOS against the npm release of Claude Code (2.1.301). All 12 jobs (10 of the unit tests, 2 of the real-binary checks) passed on the first green run, on 2026-10-16, and again on the release commit. The badges at the top show the latest runs.
 
-- **349 automated tests** (`npm test`, Node's own runner, no dependencies, about 5 seconds). `node --test` also reports each of the five helper files under `test/` as a passing test, on every Node version CI runs (18 to 24); those are not counted here. Without a Claude Code binary 322 pass on Windows and 323 on Linux and macOS (the test of file modes is skipped on Windows). 26 are the real-binary checks below and run only when `E2E_CLAUDE` names one. The tests cover:
+- **352 automated tests** (`npm test`, Node's own runner, no dependencies, about 5 seconds). `node --test` also reports each of the five helper files under `test/` as a passing test, on every Node version CI runs (18 to 24); those are not counted here. Without a Claude Code binary 325 pass on Windows and 326 on Linux and macOS (the test of file modes is skipped on Windows). 26 are the real-binary checks below and run only when `E2E_CLAUDE` names one. The tests cover:
   - the JSONC reader: 500 random documents in four layouts read the way `JSON.parse` reads them, and 5,000 damaged ones accepted or refused as `JSON.parse` does;
   - the editing of text: 1,500 random documents for insert and for remove and 1,000 for replace, with every comment outside the changed element still there, and CRLF, tabs and spaces kept;
   - `build`: 1,000 random documents, and the output built again is the same;
