@@ -52,8 +52,9 @@ export function renderShow(m, { color = false } = {}) {
   }
   out.push("");
   const live = m.files.filter((f) => f.state === "read" || f.state === "empty").length;
-  out.push(`${p.bold("Merged settings")} (${plural(m.entries.length, "value")} from ${plural(live, "file")}; a higher file wins a key, objects merge key by key, lists are joined)`);
-  if (!m.entries.length) out.push(p.dim("  nothing is set"));
+  const heading = m.only ? `Merged settings under ${m.only}` : "Merged settings";
+  out.push(`${p.bold(heading)} (${plural(m.entries.length, "value")} from ${plural(live, "file")}; a higher file wins a key, objects merge key by key, lists are joined)`);
+  if (!m.entries.length) out.push(p.dim(`  nothing is set${m.only ? ` under ${m.only}` : ""}`));
   const kw = Math.min(46, Math.max(10, ...m.entries.map((e) => e.path.length)));
   for (const e of m.entries) {
     if (e.items) {

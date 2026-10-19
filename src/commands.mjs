@@ -31,7 +31,7 @@ function fileState(f, lint) {
 }
 
 /** show: the merged settings and where each key came from. */
-export function buildShow({ project, env, home, platform, managed }) {
+export function buildShow({ project, env, home, platform, managed, only = null }) {
   const settings = loadSettings({ project, env, home, platform, managed });
   const linted = lintSettings(settings);
   const byPath = new Map(linted.files.map((l) => [l.path, l]));
@@ -44,7 +44,9 @@ export function buildShow({ project, env, home, platform, managed }) {
   const merged = merge(settings.files.filter((f) => f.exists).map((f) => ({ source: sourceOf(f), data: (byPath.get(f.path) || {}).effective ? byPath.get(f.path).effective.data : null })));
   const meta = loadSchema().meta;
   const schema = vendored();
-  const entries = merged.entries.map((e) => ({
+  const onlyPath = only ? parsePath(only) : null;
+  const mergedEntries = onlyPath ? entriesUnder(merged.entries, onlyPath) : merged.entries;
+  const entries = mergedEntries.map((e) => ({
     path: formatPath(e.path),
     keyPath: e.path,
     value: e.value,
@@ -53,14 +55,18 @@ export function buildShow({ project, env, home, platform, managed }) {
     items: e.items ? e.items.map((i) => ({ value: i.value, source: i.source, also: i.also })) : undefined,
     inSchema: schema.nodeAt(e.path.length ? e.path.slice(0, Math.min(e.path.length, 2)) : []) !== null,
   }));
-  return {
+  const underTree = onlyPath ? onlyPath.reduce((v, k) => (v === undefined || v === null || typeof v !== "object" ? undefined : v[k]), merged.tree) : merged.tree;
+  const tree = underTree !== undefined ? underTree : {};
+  const doc = {
     project: settings.project, configDir: settings.configDir, configSource: settings.configSource,
     schema: { downloaded: meta.downloaded, source: meta.source },
-    files, entries, tree: merged.tree,
+    files, entries, tree,
     counts: { entries: entries.length, shadowed: entries.filter((e) => e.shadowed.length).length, findings: linted.counts },
     notRead: NOT_READ,
     settings, // for the caller; stripped before JSON
   };
+  if (only) doc.only = only;
+  return doc;
 }
 
 /** lint: the findings of every file that applies to a project, or of one file (--file). */
