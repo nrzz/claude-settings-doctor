@@ -37,6 +37,7 @@ test("parseArgs: an option may be written --name=value, and the options may come
   assert.equal(parseArgs(["lint", "--file=a=b.json"]).file, "a=b.json", "only the first = separates");
   assert.equal(parseArgs(["show", "--only=permissions"]).only, "permissions");
   assert.equal(parseArgs(["show", "--only", "permissions.defaultMode"]).only, "permissions.defaultMode");
+  assert.equal(parseArgs(["show", "--shadowed"]).shadowed, true);
 });
 
 test("parseArgs: only the first command word is the command; a later one is an argument", () => {
@@ -63,6 +64,7 @@ test("parseArgs: what it refuses", () => {
   bad(["show", "--only", "--json"], /--only needs a key/);
   bad(["show", "--only="], /--only needs a key/);
   bad(["show", "--only", "   "], /--only needs a key/);
+  bad(["show", "--shadowed=1"], /--shadowed does not take a value/);
   bad(["lint", "--json", "--markdown"], /--json and --markdown cannot be combined/);
 });
 
@@ -106,6 +108,14 @@ test("the options a command does not take are refused by name", async () => {
     [["lint", "--only", "key"], /--only does not belong to lint/],
     [["explain", "key", "--only", "key"], /--only does not belong to explain/],
     [["build", "--user", "--only", "key"], /--only does not belong to build/],
+    [["lint", "--shadowed"], /--shadowed does not belong to lint/],
+    [["explain", "key", "--shadowed"], /--shadowed does not belong to explain/],
+    [["build", "--user", "--shadowed"], /--shadowed does not belong to build/],
+    [["init", "--user", "--shadowed"], /--shadowed does not belong to init/],
+    [["check", "--user", "--shadowed"], /--shadowed does not belong to check/],
+    [["absorb", "--user", "--shadowed"], /--shadowed does not belong to absorb/],
+    [["watch", "--user", "--shadowed"], /--shadowed does not belong to watch/],
+    [["restore", "--user", "--shadowed"], /--shadowed does not belong to restore/],
   ];
   for (const [argv, message] of cases) {
     const r = await run(argv, w);
@@ -150,7 +160,7 @@ test("help and version: exit 0, whatever else was typed; every command and optio
   const w = world("help");
   const help = await run(["--help"], w);
   assert.equal(help.code, 0);
-  for (const word of ["show", "lint", "explain", "init", "build", "check", "absorb", "watch", "restore", "--user", "--project", "--local", "--dry-run", "--force", "--json", "--markdown", "--file", "--poll", "--jsonc", "--list", "--no-color", "--version", "CLAUDE_CONFIG_DIR", "Exit codes"]) assert.ok(help.out.includes(word), word);
+  for (const word of ["show", "lint", "explain", "init", "build", "check", "absorb", "watch", "restore", "--user", "--project", "--local", "--dry-run", "--force", "--json", "--markdown", "--file", "--poll", "--jsonc", "--list", "--shadowed", "--no-color", "--version", "CLAUDE_CONFIG_DIR", "Exit codes"]) assert.ok(help.out.includes(word), word);
   assert.match(help.out, /^claude-settings-doctor \d+\.\d+\.\d+\nComments for your Claude Code settings/);
   assert.equal((await run(["-h"], w)).out, help.out);
   assert.equal((await run(["show", "--bogus", "--help"], w)).code, 2, "an unknown option is still an error");

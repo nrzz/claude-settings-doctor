@@ -15,7 +15,7 @@ Comments for your Claude Code settings, and the merged settings nobody shows you
 Usage: claude-settings-doctor <command> [options]
 
 Read (they change nothing):
-  show     [--project <dir>] [--only <key>]
+  show     [--project <dir>] [--only <key>] [--shadowed]
            the settings Claude Code merges: every value, the file it came from, which file wins,
            and the values a higher file shadows
   lint     [--project <dir>] [--file <path>] [--markdown]
@@ -76,11 +76,11 @@ class UsageError extends Error {}
 const COMMANDS = new Set(["show", "lint", "explain", "init", "build", "check", "absorb", "watch", "restore"]);
 const WRITES = new Set(["init", "build", "check", "absorb", "watch", "restore"]);
 const FLAGS_WITH_VALUE = new Set(["--project", "--file", "--poll", "--only"]);
-const FLAGS = new Set([...FLAGS_WITH_VALUE, "--user", "--local", "--json", "--markdown", "--dry-run", "--force", "--jsonc", "--list", "--no-color", "-h", "--help", "-v", "--version"]);
+const FLAGS = new Set([...FLAGS_WITH_VALUE, "--user", "--local", "--json", "--markdown", "--dry-run", "--force", "--jsonc", "--list", "--no-color", "--shadowed", "-h", "--help", "-v", "--version"]);
 
 /** Parse argv into { command, positional, project, file, poll, user, local, json, ... }. */
 export function parseArgs(argv) {
-  const o = { command: null, positional: [], project: null, file: null, only: null, poll: 0, user: false, local: false, json: false, markdown: false, dryRun: false, force: false, jsonc: false, list: false, help: false, version: false, noColor: false };
+  const o = { command: null, positional: [], project: null, file: null, only: null, shadowed: false, poll: 0, user: false, local: false, json: false, markdown: false, dryRun: false, force: false, jsonc: false, list: false, help: false, version: false, noColor: false };
   for (let i = 0; i < argv.length; i++) {
     let a = argv[i];
     let inline = null;
@@ -114,6 +114,7 @@ export function parseArgs(argv) {
         case "--force": o.force = true; break;
         case "--jsonc": o.jsonc = true; break;
         case "--list": o.list = true; break;
+        case "--shadowed": o.shadowed = true; break;
         case "--no-color": o.noColor = true; break;
         case "-h": case "--help": o.help = true; break;
         case "-v": case "--version": o.version = true; break;
@@ -177,18 +178,18 @@ export async function main(argv, io = {}) {
 
   try {
     const wrongFlags = (allowed, what) => {
-      for (const [flag, on] of [["--user", o.user], ["--local", o.local], ["--markdown", o.markdown], ["--dry-run", o.dryRun], ["--force", o.force], ["--jsonc", o.jsonc], ["--list", o.list], ["--file", o.file !== null], ["--poll", o.poll > 0], ["--only", o.only !== null]]) {
+      for (const [flag, on] of [["--user", o.user], ["--local", o.local], ["--markdown", o.markdown], ["--dry-run", o.dryRun], ["--force", o.force], ["--jsonc", o.jsonc], ["--list", o.list], ["--file", o.file !== null], ["--poll", o.poll > 0], ["--only", o.only !== null], ["--shadowed", o.shadowed]]) {
         if (on && !allowed.includes(flag)) throw new UsageError(`${flag} does not belong to ${what}`);
       }
     };
-    wrongFlags({ show: ["--only"], lint: ["--markdown", "--file"], explain: [], init: ["--user", "--local", "--dry-run", "--force"], build: ["--user", "--local", "--dry-run", "--force"], check: ["--user", "--local"], absorb: ["--user", "--local", "--dry-run"], watch: ["--user", "--local", "--dry-run", "--poll"], restore: ["--user", "--local", "--dry-run", "--jsonc", "--list"] }[o.command], o.command);
+    wrongFlags({ show: ["--only", "--shadowed"], lint: ["--markdown", "--file"], explain: [], init: ["--user", "--local", "--dry-run", "--force"], build: ["--user", "--local", "--dry-run", "--force"], check: ["--user", "--local"], absorb: ["--user", "--local", "--dry-run"], watch: ["--user", "--local", "--dry-run", "--poll"], restore: ["--user", "--local", "--dry-run", "--jsonc", "--list"] }[o.command], o.command);
     if (o.markdown && o.command !== "lint") throw new UsageError("--markdown is for lint");
     const projectDir = path.resolve(cwd, o.project || ".");
 
     switch (o.command) {
       case "show": {
         if (o.positional.length) throw new UsageError(`show takes no arguments (got "${o.positional[0]}")`);
-        const m = buildShow({ ...common, project: projectDir, only: o.only });
+        const m = buildShow({ ...common, project: projectDir, only: o.only, shadowed: o.shadowed });
         emit(m, renderShow(m, { color }));
         return 0;
       }

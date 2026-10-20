@@ -4,6 +4,8 @@ All notable changes to claude-settings-doctor are written here. The format follo
 
 ## [Unreleased]
 
+- `show --shadowed` prints only the merged entries that have at least one shadowed value; the list of files at the top stays whole, the heading says `Merged settings, shadowed only` (or `Merged settings under <key>, shadowed only` with `--only`), and when nothing is shadowed it prints `nothing is shadowed` (or `nothing is shadowed under <key>`) and exits 0. With `--json`, `entries` holds only the shadowed entries, `tree` is unchanged, `counts.entries` is the number shown, and the document gets `"shadowed": true`. The other commands refuse `--shadowed` by name.
+
 ## [1.1.0] - 2026-10-19
 
 - `show --only <key>` prints only the merged entries at or below a key (`permissions`, `permissions.defaultMode`, `hooks.PreToolUse`, `env`), each with the file it came from and what a higher file shadows; the list of files at the top stays whole, the heading says the key, and a key with nothing under it prints `nothing is set under <key>` and exits 0. With `--json`, `entries` and `tree` hold only what is under the key and the document gets `"only": "<key>"`. `--only` with no value, or an empty one, is a usage error (exit 2), and the other commands refuse it by name.

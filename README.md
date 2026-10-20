@@ -67,7 +67,7 @@ The examples are real runs in a throwaway folder on Windows 11; the paths are sh
 Usage: claude-settings-doctor <command> [options]
 
 Read (they change nothing):
-  show     [--project <dir>] [--only <key>]
+  show     [--project <dir>] [--only <key>] [--shadowed]
            the settings Claude Code merges: every value, the file it came from, which file wins,
            and the values a higher file shadows
   lint     [--project <dir>] [--file <path>] [--markdown]
@@ -127,7 +127,7 @@ Every command takes `--json` (one JSON document on stdout, see the end of this s
 
 ### `show`
 
-`show [--project <dir>] [--only <key>]` reads the managed, user, project and local files that apply to the folder (the current one, or `--project`). It prints them from the highest precedence down with their state: not found, read, empty, unreadable, or ignored by Claude Code and why. Then it prints every value of the merge with the file it came from. A value a higher file replaced is listed under it as shadowed. A list is its items, each with its file (a rule in two files is one item, with both named). A key the schema does not list is tagged, at the first two levels of its path (`lint` looks at every level). `--only <key>` prints only the entries at or below a key (such as `permissions` or `env`). `show` ends with what it does not read.
+`show [--project <dir>] [--only <key>] [--shadowed]` reads the managed, user, project and local files that apply to the folder (the current one, or `--project`). It prints them from the highest precedence down with their state: not found, read, empty, unreadable, or ignored by Claude Code and why. Then it prints every value of the merge with the file it came from. A value a higher file replaced is listed under it as shadowed. A list is its items, each with its file (a rule in two files is one item, with both named). A key the schema does not list is tagged, at the first two levels of its path (`lint` looks at every level). `--only <key>` prints only the entries at or below a key (such as `permissions` or `env`). `--shadowed` keeps only the entries that have at least one shadowed value. `show` ends with what it does not read.
 
 ```text
 claude-settings-doctor show
@@ -479,7 +479,7 @@ Every command takes `--json` and then prints one JSON document and nothing else,
 show     { project, configDir, configSource, schema: { downloaded, source },
            files: [ { scope, label, display, path, rank, exists, state, detail, topLevelKeys, findings } ],
            entries: [ { path, keyPath, value, source, shadowed: [ { source, value } ], items?, inSchema } ],
-           tree, counts: { entries, shadowed, findings }, notRead, only? }
+           tree, counts: { entries, shadowed, findings }, notRead, only?, shadowed? }
 lint     { project, configDir, configSource, schema,
            findings: [ { id, severity, effect, scope, file, display, line, column, path, keyPath, message, fix?, suggestions?, notChecked? } ],
            files: [ { scope, label, path, display, rank, exists, findings, ignored, notChecked? } ],
