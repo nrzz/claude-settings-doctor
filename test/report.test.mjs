@@ -143,6 +143,81 @@ test("show --only <key> --json: entries and tree hold only what is under the key
   assert.equal(none.counts.shadowed, 0);
 });
 
+test("show --shadowed: keeps only entries that have at least one shadowed value, text and JSON", async () => {
+  const w = world("show-shadowed", {
+    user: { model: "u", env: { A: "1", B: "2" } },
+    project: { model: "p", env: { B: "3" } },
+  });
+  const r = await run(["show", "--shadowed", "--no-color"], w);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /Settings files, highest precedence first/);
+  assert.match(r.out, /Merged settings, shadowed only \(2 values from 2 files;/);
+  assert.match(r.out, /\n {2}model\s+"p"\s+project\n {6}shadowed: "u" in user settings/);
+  assert.match(r.out, /\n {2}env\.B\s+"3"\s+project\n {6}shadowed: "2" in user settings/);
+  assert.ok(!r.out.includes("env.A"), "non-shadowed entry is omitted");
+
+  // JSON
+  const j = (await run(["show", "--shadowed", "--json"], w)).json();
+  assert.equal(j.shadowed, true);
+  assert.deepEqual(j.entries.map((e) => e.path), ["model", "env.B"]);
+  assert.equal(j.counts.entries, 2);
+  assert.equal(j.counts.shadowed, 2);
+  assert.deepEqual(j.tree, { model: "p", env: { A: "1", B: "3" } }, "tree is the merge, not the view");
+});
+
+test("show --shadowed: nothing shadowed prints nothing is shadowed and exits 0", async () => {
+  const w = world("show-shadowed-empty", {
+    user: { model: "u" },
+  });
+  const r = await run(["show", "--shadowed"], w);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /Merged settings, shadowed only \(0 values from 1 file;/);
+  assert.match(r.out, /\n {2}nothing is shadowed\n/);
+
+  // JSON
+  const j = (await run(["show", "--shadowed", "--json"], w)).json();
+  assert.equal(j.shadowed, true);
+  assert.deepEqual(j.entries, []);
+  assert.equal(j.counts.entries, 0);
+  assert.equal(j.counts.shadowed, 0);
+  assert.deepEqual(j.tree, { model: "u" });
+});
+
+test("show --shadowed --only <key>: combines filters, text and JSON, including empty case", async () => {
+  const w = world("show-shadowed-only", {
+    user: { model: "u", env: { A: "1", B: "2" }, permissions: { defaultMode: "dontAsk" } },
+    project: { model: "p", env: { B: "3" } },
+  });
+  const r = await run(["show", "--shadowed", "--only", "env", "--no-color"], w);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /Merged settings under env, shadowed only \(1 value from 2 files;/);
+  assert.match(r.out, /\n {2}env\.B\s+"3"\s+project\n {6}shadowed: "2" in user settings/);
+  assert.ok(!r.out.includes("model"), "model is outside --only env");
+  assert.ok(!r.out.includes("env.A"), "env.A is not shadowed");
+
+  // JSON
+  const j = (await run(["show", "--shadowed", "--only", "env", "--json"], w)).json();
+  assert.equal(j.shadowed, true);
+  assert.equal(j.only, "env");
+  assert.deepEqual(j.entries.map((e) => e.path), ["env.B"]);
+  assert.equal(j.counts.entries, 1);
+  assert.equal(j.counts.shadowed, 1);
+  assert.deepEqual(j.tree, { A: "1", B: "3" });
+
+  // empty case under --only
+  const none = await run(["show", "--shadowed", "--only", "permissions"], w);
+  assert.equal(none.code, 0);
+  assert.match(none.out, /Merged settings under permissions, shadowed only \(0 values from 2 files;/);
+  assert.match(none.out, /\n {2}nothing is shadowed under permissions\n/);
+
+  const noneJson = (await run(["show", "--shadowed", "--only", "permissions", "--json"], w)).json();
+  assert.equal(noneJson.shadowed, true);
+  assert.equal(noneJson.only, "permissions");
+  assert.deepEqual(noneJson.entries, []);
+  assert.equal(noneJson.counts.entries, 0);
+  assert.equal(noneJson.counts.shadowed, 0);
+});
+
 // ---- lint --------------------------------------------------------------------------------------------------------
 
 test("lint: each file with its findings, the line, the key and what to do; a count at the end", async () => {
