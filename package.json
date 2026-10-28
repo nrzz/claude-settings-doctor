@@ -1,6 +1,6 @@
 {
   "name": "claude-settings-doctor",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Comments for your Claude Code settings, and the merged settings nobody shows you: a settings.jsonc that builds settings.json, a lint against the schema, and a view of what every file contributes. Zero tokens.",
   "type": "module",
   "bin": {

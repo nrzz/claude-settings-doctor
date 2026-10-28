@@ -4,7 +4,11 @@ All notable changes to claude-settings-doctor are written here. The format follo
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-28
+
 - `show --shadowed` prints only the merged entries that have at least one shadowed value; the list of files at the top stays whole, the heading says `Merged settings, shadowed only` (or `Merged settings under <key>, shadowed only` with `--only`), and when nothing is shadowed it prints `nothing is shadowed` (or `nothing is shadowed under <key>`) and exits 0. With `--json`, `entries` holds only the shadowed entries, `tree` is unchanged, `counts.entries` is the number shown, and the document gets `"shadowed": true`. The other commands refuse `--shadowed` by name.
+- Contributed by [@yoreva-01](https://github.com/yoreva-01) in [#4](https://github.com/nrzz/claude-settings-doctor/pull/4), for the good first issue [#3](https://github.com/nrzz/claude-settings-doctor/issues/3).
+- The README's test count is the runner's again: 355 automated tests (360 with the 5 helper files), 328 passing on Windows and 329 on Linux and macOS without a binary. It had said 352 before the pull request's three tests.
 
 ## [1.1.0] - 2026-10-19
 
@@ -19,5 +23,6 @@ All notable changes to claude-settings-doctor are written here. The format follo
 - What Claude Code does about a mistake is what the real binary did: `test/e2e-claude.test.mjs` puts 97 settings (86 with something wrong in them, 11 that the binary takes as they are) to Claude Code 2.1.295 and 2.1.299, and the same checks run in CI on Linux and macOS with the newest npm release (README "What was verified").
 - Zero tokens for the tool. The skill is user-only, adds nothing to a request that does not use it, and hands the model a report of at most 12 findings.
 
+[1.2.0]: https://github.com/nrzz/claude-settings-doctor/releases/tag/v1.2.0
 [1.1.0]: https://github.com/nrzz/claude-settings-doctor/releases/tag/v1.1.0
 [1.0.0]: https://github.com/nrzz/claude-settings-doctor/releases/tag/v1.0.0

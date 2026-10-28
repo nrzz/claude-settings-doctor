@@ -1,7 +1,7 @@
 {
   "name": "settings-doctor",
   "displayName": "Settings Doctor",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Comments for your Claude Code settings, the merged settings with the file each value came from, and a lint against the schema. One user-only skill: /settings-doctor:check.",
   "author": { "name": "Naresh Prabu" },
   "homepage": "https://github.com/nrzz/claude-settings-doctor",
